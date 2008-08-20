@@ -4,12 +4,7 @@ from django.db.models.query import Q
 from django.conf import settings
 
 import openid.store
-
-# needed for some linux distributions like debian
-try:
-    from openid.yadis import xri
-except:
-    from yadis import xri
+from openid.yadis import xri
 
 import time, base64, md5, operator
 

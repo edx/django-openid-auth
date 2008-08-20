@@ -8,12 +8,7 @@ import md5, re, time, urllib
 from openid.consumer.consumer import Consumer, \
     SUCCESS, CANCEL, FAILURE, SETUP_NEEDED
 from openid.consumer.discover import DiscoveryFailure
-
-# needed for some linux distributions like debian
-try:
-    from openid.yadis import xri
-except:
-    from yadis import xriœ
+from openid.yadis import xri
 
 
 from util import OpenID, DjangoOpenIDStore, from_openid_response
@@ -109,16 +104,22 @@ def begin(request, sreg=None, extension_args=None, redirect_to=None,
             'form': form_signin,
             'action': request.path,
             'logo': request.path + 'logo/',
-            'openids': request.session['openids'],
+            'openids': request.session.get('openids', []),
         })
     
 def complete(request, on_success=None, on_failure=None):
     on_success = on_success or default_on_success
     on_failure = on_failure or default_on_failure
     
+
+    redirect_to = getattr(
+        settings, 'OPENID_REDIRECT_TO',
+        get_full_url(request).split('?')[0]
+        )
+
     consumer = Consumer(request.session, DjangoOpenIDStore())
-    openid_response = consumer.complete(dict(request.GET.items()))
-    
+    openid_response = consumer.complete(dict(request.GET.items()), redirect_to)
+
     if openid_response.status == SUCCESS:
         return on_success(request, openid_response.identity_url, openid_response)
     elif openid_response.status == CANCEL:
