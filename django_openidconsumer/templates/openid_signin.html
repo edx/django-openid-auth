@@ -1,3 +1,5 @@
+{% load i18n %}
+
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN"
   "http://www.w3.org/TR/html4/strict.dtd">
 <html>
@@ -13,10 +15,24 @@ input.openid {
 </head>
 <body>
 <h1>Sign in with your OpenID</h1>
-
-<form action="{{ action }}" method="post">
-<p><input class="openid" type="text" name="openid_url"> <input type="submit" value="Sign in"></p>
-</form>
-
+{% if form.errors %}
+<p class="errors">{% trans "Please correct errors below:" %}<br />
+	{% if form.openid_url.errors %} 
+		<span class="error">{{ form.openid_url.errors|join:", " }}</span>
+	{% endif %}
+	{% if form.next.errors %} 
+		<span class="error">{{ form.next.errors|join:", " }}</span>
+	{% endif %}
+</p>
+{% endif %}
+<form name="fopenid" action="{{ action }}" method="post">
+    {{ form.next }}
+	<fieldset>
+		<legend>{% trans "Sign In Using Your OpenID" %}</legend>
+        <div class="form-row"><label for="id_openid_ul">{% trans "OpenId URL :" %}</label><br />{{ form.openid_url }}</div>     
+        <div class="submit-row "><input name="bsignin" type="submit" value="{% trans "Sign in with OPENID" %}"></div>
+		
+	</fieldset>
+</form>	
 </body>
 </html>

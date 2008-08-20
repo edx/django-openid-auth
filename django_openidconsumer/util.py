@@ -1,10 +1,18 @@
 from openid.store.interface import OpenIDStore
 from openid.association import Association as OIDAssociation
-from yadis import xri
-
-import time, base64, md5
-
+from django.db.models.query import Q
 from django.conf import settings
+
+import openid.store
+
+# needed for some linux distributions like debian
+try:
+    from openid.yadis import xri
+except:
+    from yadis import xri
+
+import time, base64, md5, operator
+
 from models import Association, Nonce
 
 class OpenID:
@@ -70,27 +78,37 @@ class DjangoOpenIDStore(OpenIDStore):
         for assoc in assocs:
             assoc.delete()
         return assocs_exist
-    
-    def storeNonce(self, nonce):
-        nonce, created = Nonce.objects.get_or_create(
-            nonce = nonce, defaults={'expires': int(time.time())}
-        )
-    
-    def useNonce(self, nonce):
-        try:
-            nonce = Nonce.objects.get(nonce = nonce)
-        except Nonce.DoesNotExist:
-            return 0
+
+    def useNonce(self, server_url, timestamp, salt):
+        if abs(timestamp - time.time()) > openid.store.nonce.SKEW:
+            return False
         
-        # Now check nonce has not expired
-        nonce_age = int(time.time()) - nonce.expires
-        if nonce_age > self.max_nonce_age:
-            present = 0
-        else:
-            present = 1
-        nonce.delete()
-        return present
-    
+        query =[
+                Q(server_url__exact=server_url),
+                Q(timestamp__exact=timestamp),
+                Q(salt__exact=salt),
+        ]
+        try:
+            ononce = Nonce.objects.get(reduce(operator.and_, query))
+        except Nonce.DoesNotExist:
+            ononce = Nonce(
+                    server_url=server_url,
+                    timestamp=timestamp,
+                    salt=salt
+            );
+            ononce.save()
+            return True
+        
+        ononce.delete()
+
+        return False
+   
+    def cleanupNonce(self):
+        Nonce.objects.filter(timestamp<int(time.time()) - nonce.SKEW).delete()
+
+    def cleaupAssociations(self):
+        Association.objects.extra(where=['issued + lifetimeint<(%s)' % time.time()]).delete()
+
     def getAuthKey(self):
         # Use first AUTH_KEY_LEN characters of md5 hash of SECRET_KEY
         return md5.new(settings.SECRET_KEY).hexdigest()[:self.AUTH_KEY_LEN]
@@ -101,6 +119,6 @@ class DjangoOpenIDStore(OpenIDStore):
 def from_openid_response(openid_response):
     issued = int(time.time())
     return OpenID(
-        openid_response.identity_url, issued, openid_response.signed_args, 
-        openid_response.extensionResponse('sreg')
+        openid_response.identity_url, issued, openid_response.signed_fields, 
+        openid_response.extensionResponse('sreg', False)
     )

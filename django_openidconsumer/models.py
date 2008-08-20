@@ -1,11 +1,14 @@
 from django.db import models
 
 class Nonce(models.Model):
-    nonce = models.CharField(maxlength=8)
-    expires = models.IntegerField()
-    def __str__(self):
-        return "Nonce: %s" % self.nonce
+    server_url = models.CharField(maxlength=255)
+    timestamp = models.IntegerField()
+    salt = models.CharField(max_length=40)
+    
+    def __unicode__(self):
+        return u"Nonce: %s" % self.id
 
+    
 class Association(models.Model):
     server_url = models.TextField(maxlength=2047)
     handle = models.CharField(maxlength=255)
@@ -13,5 +16,7 @@ class Association(models.Model):
     issued = models.IntegerField()
     lifetime = models.IntegerField()
     assoc_type = models.TextField(maxlength=64)
-    def __str__(self):
-        return "Association: %s, %s" % (self.server_url, self.handle)
+    
+    def __unicode__(self):
+        return u"Association: %s, %s" % (self.server_url, self.handle)
+

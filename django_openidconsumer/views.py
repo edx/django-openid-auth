@@ -2,14 +2,23 @@ from django.http import HttpResponse, HttpResponseRedirect, get_host
 from django.shortcuts import render_to_response as render
 from django.template import RequestContext
 from django.conf import settings
+from django.utils.http import urlquote_plus, urlquote
 
 import md5, re, time, urllib
 from openid.consumer.consumer import Consumer, \
     SUCCESS, CANCEL, FAILURE, SETUP_NEEDED
 from openid.consumer.discover import DiscoveryFailure
-from yadis import xri
+
+# needed for some linux distributions like debian
+try:
+    from openid.yadis import xri
+except:
+    from yadis import xriœ
+
 
 from util import OpenID, DjangoOpenIDStore, from_openid_response
+
+from forms import OpenidSigninForm
 
 from django.utils.html import escape
 
@@ -42,67 +51,67 @@ def begin(request, sreg=None, extension_args=None, redirect_to=None,
         on_failure=None):
     
     on_failure = on_failure or default_on_failure
-    
-    if request.GET.get('logo'):
-        # Makes for a better demo
-        return logo(request)
-    
     extension_args = extension_args or {}
-    if sreg:
-        extension_args['sreg.optional'] = sreg
-    trust_root = getattr(
-        settings, 'OPENID_TRUST_ROOT', get_url_host(request) + '/'
-    )
-    redirect_to = redirect_to or getattr(
-        settings, 'OPENID_REDIRECT_TO',
-        # If not explicitly set, assume current URL with complete/ appended
-        get_full_url(request).split('?')[0] + 'complete/'
-    )
-    # In case they were lazy...
-    if not redirect_to.startswith('http://'):
-        redirect_to =  get_url_host(request) + redirect_to
     
-    if request.GET.get('next') and is_valid_next_url(request.GET['next']):
-        if '?' in redirect_to:
-            join = '&'
-        else:
-            join = '?'
-        redirect_to += join + urllib.urlencode({
+    next = ''
+    if request.GET.get('next'):
+        next = urllib.urlencode({
             'next': request.GET['next']
         })
-    
-    user_url = request.POST.get('openid_url', None)
-    if not user_url:
-        request_path = request.path
-        if request.GET.get('next'):
-            request_path += '?' + urllib.urlencode({
-                'next': request.GET['next']
-            })
         
-        return render('openid_signin.html', {
-            'action': request_path,
-            'logo': request.path + '?logo=1',
+  
+    form_signin = OpenidSigninForm(initial={'next':next})
+    if request.POST:
+        form_signin = OpenidSigninForm(request.POST)
+        if form_signin.is_valid():
+            consumer = Consumer(request.session, DjangoOpenIDStore())
+            try:
+                auth_request = consumer.begin(form_signin.cleaned_data['openid_url'])
+            except DiscoveryFailure:
+                return on_failure(request, "The OpenID was invalid")
+
+            if sreg:
+                extension_args['sreg.optional'] = sreg
+            
+            trust_root = getattr(
+                    settings, 'OPENID_TRUST_ROOT', get_url_host(request) + '/'
+                )
+        
+            redirect_to = redirect_to or getattr(
+                settings, 'OPENID_REDIRECT_TO',
+                # If not explicitly set, assume current URL with complete/ appended
+                get_full_url(request).split('?')[0] + 'complete/'
+            )
+
+            # TODO: add redirect_to in form 
+            if not redirect_to.startswith('http://'):
+                redirect_to =  get_url_host(request) + redirect_to
+
+
+            if 'next' in form_signin.cleaned_data and next != "":
+                if '?' in redirect_to:
+                    join = '&'
+                else:
+                    join = '?'
+                redirect_to += join + urllib.urlencode({
+                    'next': form_signin.cleaned_data['next']
+                })
+    
+            # Add extension args (for things like simple registration)
+            for name, value in extension_args.items():
+                namespace, key = name.split('.', 1)
+                auth_request.addExtensionArg(namespace, key, value)
+    
+            redirect_url = auth_request.redirectURL(trust_root, redirect_to)
+            return HttpResponseRedirect(redirect_url)
+
+    return render('openid_signin.html', {
+            'form': form_signin,
+            'action': request.path,
+            'logo': request.path + 'logo/',
+            'openids': request.session['openids'],
         })
     
-    if xri.identifierScheme(user_url) == 'XRI' and getattr(
-        settings, 'OPENID_DISALLOW_INAMES', False
-        ):
-        return on_failure(request, 'i-names are not supported')
-    
-    consumer = Consumer(request.session, DjangoOpenIDStore())
-    try:
-        auth_request = consumer.begin(user_url)
-    except DiscoveryFailure:
-        return on_failure(request, "The OpenID was invalid")
-    
-    # Add extension args (for things like simple registration)
-    for name, value in extension_args.items():
-        namespace, key = name.split('.', 1)
-        auth_request.addExtensionArg(namespace, key, value)
-    
-    redirect_url = auth_request.redirectURL(trust_root, redirect_to)
-    return HttpResponseRedirect(redirect_url)
-
 def complete(request, on_success=None, on_failure=None):
     on_success = on_success or default_on_success
     on_failure = on_failure or default_on_failure
