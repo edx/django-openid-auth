@@ -26,12 +26,15 @@ input.openid {
 </p>
 {% endif %}
 <form name="fopenid" action="{{ action }}" method="post">
-    {{ form.next }}
 	<fieldset>
 		<legend>{% trans "Sign In Using Your OpenID" %}</legend>
         <div class="form-row"><label for="id_openid_ul">{% trans "OpenId URL :" %}</label><br />{{ form.openid_url }}</div>     
         <div class="submit-row "><input name="bsignin" type="submit" value="{% trans "Sign in with OPENID" %}"></div>
-		
+
+ {% if next %}
+	<input type="hidden" name="next" value="{{ next }}" />
+ {% endif %}
+
 	</fieldset>
 </form>	
 </body>

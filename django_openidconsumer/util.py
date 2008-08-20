@@ -1,10 +1,7 @@
 import base64
-import md5
-import operator
 import time
 
 from django.db.models.query import Q
-from django.conf import settings
 
 from openid.association import Association as OIDAssociation
 from openid.store.interface import OpenIDStore
