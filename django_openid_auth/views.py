@@ -15,9 +15,9 @@ from openid.consumer.discover import DiscoveryFailure
 from openid.extensions import sreg
 
 
-from auth import openid_authenticate
-from util import DjangoOpenIDStore
-from forms import OpenIDLoginForm
+from django_openid_auth.auth import openid_authenticate
+from django_openid_auth.forms import OpenIDLoginForm
+from django_openid_auth.store import DjangoOpenIDStore
 
 
 next_url_re = re.compile('^/[-\w/]+$')

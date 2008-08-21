@@ -2,28 +2,11 @@ import base64
 import time
 
 from django.db.models.query import Q
-
 from openid.association import Association as OIDAssociation
 from openid.store.interface import OpenIDStore
 from openid.store.nonce import SKEW
-from openid.yadis import xri
 
-from models import Association, Nonce
-
-
-class OpenID:
-    def __init__(self, openid, issued, attrs=None, sreg=None):
-        self.openid = openid
-        self.issued = issued
-        self.attrs = attrs or {}
-        self.sreg = sreg or {}
-        self.is_iname = (xri.identifierScheme(openid) == 'XRI')
-
-    def __repr__(self):
-        return '<OpenID: %s>' % self.openid
-
-    def __str__(self):
-        return self.openid
+from django_openid_auth.models import Association, Nonce
 
 
 class DjangoOpenIDStore(OpenIDStore):
@@ -109,11 +92,3 @@ class DjangoOpenIDStore(OpenIDStore):
         if count:
             expired.delete()
         return count
-
-
-def from_openid_response(openid_response):
-    issued = int(time.time())
-    return OpenID(
-        openid_response.identity_url, issued, openid_response.signed_fields, 
-        openid_response.extensionResponse('sreg', False)
-    )
