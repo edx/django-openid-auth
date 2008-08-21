@@ -6,7 +6,9 @@ from openid.yadis import xri
 
 
 class OpenIDLoginForm(forms.Form):
-    openid_url = forms.CharField(max_length=255, widget=forms.widgets.TextInput(attrs={'class': 'required openid'}))
+    openid_url = forms.CharField(
+        max_length=255,
+        widget=forms.TextInput(attrs={'class': 'required openid'}))
 
     def clean_openid_url(self):
         if 'openid_url' in self.cleaned_data:
