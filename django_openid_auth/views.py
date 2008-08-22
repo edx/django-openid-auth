@@ -131,7 +131,7 @@ def login_complete(request, redirect_field_name=REDIRECT_FIELD_NAME):
 
     openid_response = parse_openid_response(request)
     if not openid_response:
-        return HttpResponse('No OpenID response')
+        return HttpResponse('This is an OpenID relying party endpoint.')
 
     if openid_response.status == SUCCESS:
         user = authenticate(openid_response=openid_response)
