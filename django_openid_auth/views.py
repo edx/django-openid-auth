@@ -2,7 +2,8 @@ import re
 import urllib
 
 from django.conf import settings
-from django.contrib.auth import REDIRECT_FIELD_NAME, login as auth_login
+from django.contrib.auth import (
+    REDIRECT_FIELD_NAME, authenticate, login as auth_login)
 from django.core.urlresolvers import reverse
 from django.http import HttpResponse, HttpResponseRedirect
 from django.shortcuts import render_to_response
@@ -15,7 +16,6 @@ from openid.consumer.discover import DiscoveryFailure
 from openid.extensions import sreg
 
 
-from django_openid_auth.auth import openid_authenticate
 from django_openid_auth.forms import OpenIDLoginForm
 from django_openid_auth.store import DjangoOpenIDStore
 
@@ -134,7 +134,7 @@ def login_complete(request, redirect_field_name=REDIRECT_FIELD_NAME):
         return HttpResponse('No OpenID response')
 
     if openid_response.status == SUCCESS:
-        user = openid_authenticate(openid_response)
+        user = authenticate(openid_response=openid_response)
         if user is not None:
             if user.is_active:
                 auth_login(request, user)

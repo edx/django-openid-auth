@@ -78,6 +78,11 @@ INSTALLED_APPS = (
     'django_openid_auth',
 )
 
+AUTHENTICATION_BACKENDS = (
+    'django_openid_auth.auth.OpenIDBackend',
+    'django.contrib.auth.backends.ModelBackend',
+)
+
 # Should users be created when new OpenIDs are used to log in?
 OPENID_CREATE_USERS = True
 
