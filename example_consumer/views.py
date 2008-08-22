@@ -9,7 +9,7 @@ def index(request):
         s.append('You are signed in as <strong>%s</strong> (%s)' % (
                 escape(request.user.username),
                 escape(request.user.get_full_name())))
-        s.append(' | <a href="/openid/logout">Sign out</a>')
+        s.append(' | <a href="/logout">Sign out</a>')
     else:
         s.append('<a href="/openid/login">Sign in with OpenID</a>')
 
