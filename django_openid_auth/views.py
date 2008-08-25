@@ -46,8 +46,7 @@ def make_consumer(request):
     return Consumer(session, store)
 
 
-def render_openid_request(request, openid_request, return_to, trust_root=None,
-                          template_name='openid/auth-request.html'):
+def render_openid_request(request, openid_request, return_to, trust_root=None):
     """Render an OpenID authentication request."""
     if trust_root is None:
         trust_root = getattr(settings, 'OPENID_TRUST_ROOT',
@@ -60,9 +59,7 @@ def render_openid_request(request, openid_request, return_to, trust_root=None,
     else:
         form_html = openid_request.htmlMarkup(
             trust_root, return_to, form_tag_attrs={'id': 'openid_message'})
-        return render_to_response(
-            template_name, {'form': SafeString(form_html)},
-            context_instance=RequestContext(request))
+        return HttpResponse(form_html, content_type='text/html;charset=UTF-8')
 
 
 def parse_openid_response(request):

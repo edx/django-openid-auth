@@ -12,6 +12,7 @@ from django_openid_auth.store import DjangoOpenIDStore
 class OpenIDStoreTests(TestCase):
 
     def setUp(self):
+        super(OpenIDStoreTests, self).setUp()
         self.store = DjangoOpenIDStore()
 
     def test_storeAssociation(self):
