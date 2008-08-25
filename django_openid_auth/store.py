@@ -19,7 +19,7 @@ class DjangoOpenIDStore(OpenIDStore):
             handle=association.handle,
             secret=base64.encodestring(association.secret),
             issued=association.issued,
-            lifetime=association.issued,
+            lifetime=association.lifetime,
             assoc_type=association.assoc_type)
         assoc.save()
 
@@ -75,16 +75,16 @@ class DjangoOpenIDStore(OpenIDStore):
 
         return False
 
-    def cleanupNonces(self):
-        now = int(time.time())
-        expired = Nonce.objects.filter(
-            Q(timestamp__lt=now - SKEW) | Q(timestamp__gt=now + SKEW))
+    def cleanupNonces(self, _now=None):
+        if _now is None:
+            _now = int(time.time())
+        expired = Nonce.objects.filter(timestamp__lt=_now - SKEW)
         count = expired.count()
         if count:
             expired.delete()
         return count
 
-    def cleaupAssociations(self):
+    def cleanupAssociations(self):
         now = int(time.time())
         expired = Association.objects.extra(
             where=['issued + lifetime < %d' % now])
