@@ -87,7 +87,7 @@ def login_begin(request, template_name='openid/login.html',
         if request.POST:
             login_form = OpenIDLoginForm(data=request.POST)
             if login_form.is_valid():
-                openid_url = login_form.cleaned_data['openid_url']
+                openid_url = login_form.cleaned_data['openid_identifier']
         else:
             login_form = OpenIDLoginForm()
 
