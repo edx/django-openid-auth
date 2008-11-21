@@ -4,9 +4,13 @@ import time
 import unittest
 
 from django.conf import settings
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User, Group
 from django.test import TestCase
 from openid.extensions.sreg import SRegRequest, SRegResponse
+try:
+    from openid.extensions.teams import TeamsRequest, TeamsResponse
+except ImportError:
+    from _openid_extensions_teams import TeamsRequest, TeamsResponse
 from openid.fetchers import (
     HTTPFetcher, HTTPFetchingError, HTTPResponse, setDefaultFetcher)
 from openid.oidutil import importElementTree
@@ -99,14 +103,21 @@ class RelyingPartyTests(TestCase):
         self.old_create_users = getattr(settings, 'OPENID_CREATE_USERS', False)
         self.old_update_details = getattr(settings, 'OPENID_UPDATE_DETAILS_FROM_SREG', False)
         self.old_sso_server_url = getattr(settings, 'OPENID_SSO_SERVER_URL')
+        self.old_update_groups = getattr(settings, 'OPENID_UPDATE_GROUPS_FROM_TEAMS', False)
+        self.old_teams_map = getattr(settings, 'OPENID_LAUNCHPAD_TEAMS_MAPPING', {})
+
         settings.OPENID_CREATE_USERS = False
         settings.OPENID_UPDATE_DETAILS_FROM_SREG = False
         settings.OPENID_SSO_SERVER_URL = None
+        settings.OPENID_UPDATE_GROUPS_FROM_TEAMS = False
+        settings.OPENID_LAUNCHPAD_TEAMS_MAPPING = {}
 
     def tearDown(self):
         settings.OPENID_CREATE_USERS = self.old_create_users
         settings.OPENID_UPDATE_DETAILS_FROM_SREG = self.old_update_details
         settings.OPENID_SSO_SERVER_URL = self.old_sso_server_url
+        settings.OPENID_UPDATE_GROUPS_FROM_TEAMS = self.old_update_groups
+        settings.OPENID_LAUNCHPAD_TEAMS_MAPPING = self.old_teams_map
 
         setDefaultFetcher(None)
         super(RelyingPartyTests, self).tearDown()
@@ -253,6 +264,54 @@ class RelyingPartyTests(TestCase):
         self.assertEquals(user.first_name, 'Some')
         self.assertEquals(user.last_name, 'User')
         self.assertEquals(user.email, 'foo@example.com')
+
+    def test_login_teams(self):
+        settings.OPENID_UPDATE_GROUPS_FROM_TEAMS = True
+        settings.OPENID_LAUNCHPAD_TEAMS_MAPPING = {'teamname': 'groupname',
+                                                   'otherteam': 'othergroup'}
+        user = User.objects.create_user('testuser', 'someone@example.com')
+        group = Group(name='groupname')
+        group.save()
+        ogroup = Group(name='othergroup')
+        ogroup.save()
+        user.groups.add(ogroup)
+        user.save()
+        useropenid = UserOpenID(
+            user=user,
+            claimed_id='http://example.com/identity',
+            display_id='http://example.com/identity')
+        useropenid.save()
+
+        # Posting in an identity URL begins the authentication request:
+        response = self.client.post('/openid/login',
+            {'openid_identifier': 'http://example.com/identity',
+             'next': '/getuser'})
+        self.assertContains(response, 'OpenID transaction in progress')
+
+        # Complete the request
+        openid_request = self.provider.parseFormPost(response.content)
+        teams_request = TeamsRequest.fromOpenIDRequest(openid_request)
+        openid_response = openid_request.answer(True)
+        teams_response = TeamsResponse.extractResponse(teams_request,
+                                                       'teamname')
+        openid_response.addExtension(teams_response)
+        response = self.complete(openid_response)
+        try:
+            self.assertRedirects(response, 'http://testserver/getuser')
+        except:
+            print '***', response.content
+            raise
+        
+        # And they are now logged in as testuser
+        response = self.client.get('/getuser')
+        self.assertEquals(response.content, 'testuser')
+
+        # The user's groups have been updated.
+        user = User.objects.get(username='testuser')
+        self.assertTrue(group in user.groups.all())
+        self.assertTrue(ogroup not in user.groups.all())
+        
+
 
 
 def suite():
