@@ -6,10 +6,7 @@ from django.conf import settings
 from django.contrib.auth.models import User, Group
 from openid.consumer.consumer import SUCCESS
 from openid.extensions import sreg
-try:
-    from openid.extensions import teams
-except ImportError:
-    import _openid_extensions_teams as teams
+from openid.extensions import teams
 
 from django_openid_auth.models import UserOpenID
 

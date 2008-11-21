@@ -7,10 +7,7 @@ from django.conf import settings
 from django.contrib.auth.models import User, Group
 from django.test import TestCase
 from openid.extensions.sreg import SRegRequest, SRegResponse
-try:
-    from openid.extensions.teams import TeamsRequest, TeamsResponse
-except ImportError:
-    from _openid_extensions_teams import TeamsRequest, TeamsResponse
+from openid.extensions.teams import TeamsRequest, TeamsResponse
 from openid.fetchers import (
     HTTPFetcher, HTTPFetchingError, HTTPResponse, setDefaultFetcher)
 from openid.oidutil import importElementTree

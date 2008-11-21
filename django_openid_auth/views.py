@@ -14,10 +14,7 @@ from openid.consumer.consumer import (
     Consumer, SUCCESS, CANCEL, FAILURE)
 from openid.consumer.discover import DiscoveryFailure
 from openid.extensions import sreg
-try:
-    from openid.extensions import teams
-except ImportError:
-    import _openid_extensions_teams as teams
+from openid.extensions import teams
 
 
 from django_openid_auth.forms import OpenIDLoginForm
