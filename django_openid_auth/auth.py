@@ -3,9 +3,13 @@
 __metaclass__ = type
 
 from django.conf import settings
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User, Group
 from openid.consumer.consumer import SUCCESS
 from openid.extensions import sreg
+try:
+    from openid.extensions import teams
+except ImportError:
+    teams = None
 
 from django_openid_auth.models import UserOpenID
 
@@ -55,6 +59,14 @@ class OpenIDBackend:
                 openid_response)
             if sreg_response:
                 self.update_user_details_from_sreg(user, sreg_response)
+
+        if teams is not None:
+            if getattr(settings, 'OPENID_UPDATE_GROUPS_FROM_LAUNCHPAD_TEAMS', False):
+                teams_response = teams.TeamsResponse.fromSuccessResponse(
+                    openid_response)
+                if teams_response:
+                    self.update_groups_from_teams(user, teams_response)
+
         return user
 
     def create_user_from_openid(self, openid_response):
@@ -120,4 +132,20 @@ class OpenIDBackend:
         email = sreg_response.get('email')
         if email:
             user.email = email
+        user.save()
+
+    def update_groups_from_teams(self, user, teams_response):
+        teams_mapping = getattr(settings, 'OPENID_LAUNCHPAD_TEAMS_MAPPING', {})
+        resp_groups = set(Group.objects.get(name=teams_mapping[i])
+                          for i in teams_response.is_member)
+        user_groups = set(
+            i for i in user.groups.filter(name__in=teams_mapping.values()))
+
+        # the groups the user is in that aren't reported by openid
+        # should be removed
+        for group in user_groups - resp_groups:
+            user.groups.remove(group)
+        # and viceversa
+        for group in resp_groups - user_groups:
+            user.groups.add(group)
         user.save()
