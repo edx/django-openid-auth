@@ -296,11 +296,7 @@ class RelyingPartyTests(TestCase):
                                                        'teamname')
         openid_response.addExtension(teams_response)
         response = self.complete(openid_response)
-        try:
-            self.assertRedirects(response, 'http://testserver/getuser')
-        except:
-            print '***', response.content
-            raise
+        self.assertRedirects(response, 'http://testserver/getuser')
         
         # And they are now logged in as testuser
         response = self.client.get('/getuser')
