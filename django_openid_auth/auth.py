@@ -6,7 +6,10 @@ from django.conf import settings
 from django.contrib.auth.models import User, Group
 from openid.consumer.consumer import SUCCESS
 from openid.extensions import sreg
-from openid.extensions import teams
+try:
+    from openid.extensions import teams
+except ImportError:
+    teams = None
 
 from django_openid_auth.models import UserOpenID
 
@@ -57,11 +60,12 @@ class OpenIDBackend:
             if sreg_response:
                 self.update_user_details_from_sreg(user, sreg_response)
 
-        if getattr(settings, 'OPENID_UPDATE_GROUPS_FROM_TEAMS', False):
-            teams_response = teams.TeamsResponse.fromSuccessResponse(
-                openid_response)
-            if teams_response:
-                self.update_groups_from_teams(user, teams_response)
+        if teams is not None:
+            if getattr(settings, 'OPENID_UPDATE_GROUPS_FROM_LAUNCHPAD_TEAMS', False):
+                teams_response = teams.TeamsResponse.fromSuccessResponse(
+                    openid_response)
+                if teams_response:
+                    self.update_groups_from_teams(user, teams_response)
 
         return user
 
@@ -131,7 +135,7 @@ class OpenIDBackend:
         user.save()
 
     def update_groups_from_teams(self, user, teams_response):
-        teams_mapping = settings.OPENID_LAUNCHPAD_TEAMS_MAPPING
+        teams_mapping = getattr(settings, 'OPENID_LAUNCHPAD_TEAMS_MAPPING', {})
         resp_groups = set(Group.objects.get(name=teams_mapping[i])
                           for i in teams_response.is_member)
         user_groups = set(

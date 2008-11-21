@@ -7,12 +7,16 @@ from django.conf import settings
 from django.contrib.auth.models import User, Group
 from django.test import TestCase
 from openid.extensions.sreg import SRegRequest, SRegResponse
-from openid.extensions.teams import TeamsRequest, TeamsResponse
 from openid.fetchers import (
     HTTPFetcher, HTTPFetchingError, HTTPResponse, setDefaultFetcher)
 from openid.oidutil import importElementTree
 from openid.server.server import BROWSER_REQUEST_MODES, Server
 from openid.store.memstore import MemoryStore
+
+try:
+    from openid.extensions import teams
+except ImportError:
+    teams = None
 
 from django_openid_auth.models import UserOpenID
 
@@ -100,20 +104,20 @@ class RelyingPartyTests(TestCase):
         self.old_create_users = getattr(settings, 'OPENID_CREATE_USERS', False)
         self.old_update_details = getattr(settings, 'OPENID_UPDATE_DETAILS_FROM_SREG', False)
         self.old_sso_server_url = getattr(settings, 'OPENID_SSO_SERVER_URL')
-        self.old_update_groups = getattr(settings, 'OPENID_UPDATE_GROUPS_FROM_TEAMS', False)
+        self.old_update_groups = getattr(settings, 'OPENID_UPDATE_GROUPS_FROM_LAUNCHPAD_TEAMS', False)
         self.old_teams_map = getattr(settings, 'OPENID_LAUNCHPAD_TEAMS_MAPPING', {})
 
         settings.OPENID_CREATE_USERS = False
         settings.OPENID_UPDATE_DETAILS_FROM_SREG = False
         settings.OPENID_SSO_SERVER_URL = None
-        settings.OPENID_UPDATE_GROUPS_FROM_TEAMS = False
+        settings.OPENID_UPDATE_GROUPS_FROM_LAUNCHPAD_TEAMS = False
         settings.OPENID_LAUNCHPAD_TEAMS_MAPPING = {}
 
     def tearDown(self):
         settings.OPENID_CREATE_USERS = self.old_create_users
         settings.OPENID_UPDATE_DETAILS_FROM_SREG = self.old_update_details
         settings.OPENID_SSO_SERVER_URL = self.old_sso_server_url
-        settings.OPENID_UPDATE_GROUPS_FROM_TEAMS = self.old_update_groups
+        settings.OPENID_UPDATE_GROUPS_FROM_LAUNCHPAD_TEAMS = self.old_update_groups
         settings.OPENID_LAUNCHPAD_TEAMS_MAPPING = self.old_teams_map
 
         setDefaultFetcher(None)
@@ -263,7 +267,9 @@ class RelyingPartyTests(TestCase):
         self.assertEquals(user.email, 'foo@example.com')
 
     def test_login_teams(self):
-        settings.OPENID_UPDATE_GROUPS_FROM_TEAMS = True
+        if teams is None:
+            raise AssertionError, "teams extension is missing!"
+        settings.OPENID_UPDATE_GROUPS_FROM_LAUNCHPAD_TEAMS = True
         settings.OPENID_LAUNCHPAD_TEAMS_MAPPING = {'teamname': 'groupname',
                                                    'otherteam': 'othergroup'}
         user = User.objects.create_user('testuser', 'someone@example.com')
@@ -287,10 +293,10 @@ class RelyingPartyTests(TestCase):
 
         # Complete the request
         openid_request = self.provider.parseFormPost(response.content)
-        teams_request = TeamsRequest.fromOpenIDRequest(openid_request)
         openid_response = openid_request.answer(True)
-        teams_response = TeamsResponse.extractResponse(teams_request,
-                                                       'teamname')
+        teams_request = teams.TeamsRequest.fromOpenIDRequest(openid_request)
+        teams_response = teams.TeamsResponse.extractResponse(teams_request,
+                                                             'teamname')
         openid_response.addExtension(teams_response)
         response = self.complete(openid_response)
         self.assertRedirects(response, 'http://testserver/getuser')

@@ -14,7 +14,11 @@ from openid.consumer.consumer import (
     Consumer, SUCCESS, CANCEL, FAILURE)
 from openid.consumer.discover import DiscoveryFailure
 from openid.extensions import sreg
-from openid.extensions import teams
+
+try:
+    from openid.extensions import teams
+except ImportError:
+    teams = None
 
 
 from django_openid_auth.forms import OpenIDLoginForm
@@ -111,9 +115,11 @@ def login_begin(request, template_name='openid/login.html',
     openid_request.addExtension(
         sreg.SRegRequest(optional=['email', 'fullname', 'nickname']))
 
-    # Request team info
-    launchpad_teams = getattr(settings, 'OPENID_LAUNCHPAD_TEAMS_MAPPING', {})
-    openid_request.addExtension(teams.TeamsRequest(launchpad_teams.keys()))
+    if teams is not None:
+        # Request team info
+        launchpad_teams = getattr(settings, 'OPENID_LAUNCHPAD_TEAMS_MAPPING',
+                                  {})
+        openid_request.addExtension(teams.TeamsRequest(launchpad_teams.keys()))
 
     # Construct the request completion URL, including the page we
     # should redirect to.
