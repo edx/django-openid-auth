@@ -57,11 +57,10 @@ class OpenIDBackend:
             if sreg_response:
                 self.update_user_details_from_sreg(user, sreg_response)
 
-        if getattr(settings, 'OPENID_UPDATE_GROUPS_FROM_LAUNCHPAD_TEAMS', False):
-            teams_response = teams.TeamsResponse.fromSuccessResponse(
-                openid_response)
-            if teams_response:
-                self.update_groups_from_teams(user, teams_response)
+        teams_response = teams.TeamsResponse.fromSuccessResponse(
+            openid_response)
+        if teams_response:
+            self.update_groups_from_teams(user, teams_response)
 
         return user
 
@@ -132,16 +131,16 @@ class OpenIDBackend:
 
     def update_groups_from_teams(self, user, teams_response):
         teams_mapping = getattr(settings, 'OPENID_LAUNCHPAD_TEAMS_MAPPING', {})
-        resp_groups = set(Group.objects.get(name=teams_mapping[i])
-                          for i in teams_response.is_member)
-        user_groups = set(
-            i for i in user.groups.filter(name__in=teams_mapping.values()))
+        if len(teams_mapping) == 0:
+            return
 
-        # the groups the user is in that aren't reported by openid
-        # should be removed
-        for group in user_groups - resp_groups:
+        current_groups = set(user.groups.filter(
+                name__in=teams_mapping.values()))
+        desired_groups = set(Group.objects.filter(
+                name__in=[teams_mapping[lp_team]
+                          for lp_team in teams_response.is_member
+                          if lp_team in teams_mapping]))
+        for group in current_groups - desired_groups:
             user.groups.remove(group)
-        # and viceversa
-        for group in resp_groups - user_groups:
+        for group in desired_groups - current_groups:
             user.groups.add(group)
-        user.save()
