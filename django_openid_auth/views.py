@@ -111,9 +111,9 @@ def login_begin(request, template_name='openid/login.html',
         sreg.SRegRequest(optional=['email', 'fullname', 'nickname']))
 
     # Request team info
-    launchpad_teams = getattr(settings, 'OPENID_LAUNCHPAD_TEAMS_MAPPING',
-                              {})
-    openid_request.addExtension(teams.TeamsRequest(launchpad_teams.keys()))
+    launchpad_teams = getattr(settings, 'OPENID_LAUNCHPAD_TEAMS_MAPPING', {})
+    if launchpad_teams:
+        openid_request.addExtension(teams.TeamsRequest(launchpad_teams.keys()))
 
     # Construct the request completion URL, including the page we
     # should redirect to.
