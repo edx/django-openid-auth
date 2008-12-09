@@ -310,7 +310,7 @@ class TeamsResponse(Extension):
         self.ns_uri = lp_ns_uri
 
     def addTeam(self, team_name):
-        if team not in self.is_member:
+        if team_name not in self.is_member:
             self.is_member.append(team_name)
 
     def extractResponse(cls, request, is_member_str):
