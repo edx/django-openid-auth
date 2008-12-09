@@ -13,11 +13,7 @@ from openid.oidutil import importElementTree
 from openid.server.server import BROWSER_REQUEST_MODES, Server
 from openid.store.memstore import MemoryStore
 
-try:
-    from openid.extensions import teams
-except ImportError:
-    teams = None
-
+from django_openid_auth import teams
 from django_openid_auth.models import UserOpenID
 
 
@@ -267,8 +263,6 @@ class RelyingPartyTests(TestCase):
         self.assertEquals(user.email, 'foo@example.com')
 
     def test_login_teams(self):
-        if teams is None:
-            raise AssertionError, "teams extension is missing!"
         settings.OPENID_UPDATE_GROUPS_FROM_LAUNCHPAD_TEAMS = True
         settings.OPENID_LAUNCHPAD_TEAMS_MAPPING = {'teamname': 'groupname',
                                                    'otherteam': 'othergroup'}
@@ -300,7 +294,7 @@ class RelyingPartyTests(TestCase):
         openid_response.addExtension(teams_response)
         response = self.complete(openid_response)
         self.assertRedirects(response, 'http://testserver/getuser')
-        
+
         # And they are now logged in as testuser
         response = self.client.get('/getuser')
         self.assertEquals(response.content, 'testuser')
@@ -309,8 +303,6 @@ class RelyingPartyTests(TestCase):
         user = User.objects.get(username='testuser')
         self.assertTrue(group in user.groups.all())
         self.assertTrue(ogroup not in user.groups.all())
-        
-
 
 
 def suite():
