@@ -74,3 +74,19 @@ be started with the given server URL.
 As an example, to use Launchpad accounts for SSO, you'd use:
 
      OPENID_SSO_SERVER_URL = 'https://login.launchpad.net/'
+
+
+== Launchpad Teams Support ==
+
+This library supports the Launchpad Teams OpenID extension.  Using
+this feature, it is possible to map Launchpad team memberships to
+Django group memberships.  It can be configured with:
+
+    OPENID_SSO_SERVER_URL = 'https://login.launchpad.net/'
+    OPENID_LAUNCHPAD_TEAMS_MAPPING = {
+        'launchpad-team-1': 'django-group-1',
+        'launchpad-team-2': 'django-group-2',
+        }
+
+When a user logs in, they will be added or removed from the relevant
+teams listed in the mapping.
