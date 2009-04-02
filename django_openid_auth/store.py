@@ -1,7 +1,6 @@
 import base64
 import time
 
-from django.db.models.query import Q
 from openid.association import Association as OIDAssociation
 from openid.store.interface import OpenIDStore
 from openid.store.nonce import SKEW
