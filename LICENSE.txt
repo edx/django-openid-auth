@@ -1,15 +1,5 @@
-Copyright (C) 2008-2009 Canonical Ltd.  All rights reserved.
-
-XXX jamesh 2009-03-10: change above to final license terms.
-
-
-
-This package incorporates code written by Simon Willison for his
-django-openid library (http://code.google.com/p/django-openid/).
-Those portions are licensed under the following terms:
-
-Copyright (c) 2007, Simon Willison
-All rights reserved.
+Copyright (C) 2007 Simon Willison
+Copyright (C) 2008-2009 Canonical Ltd.
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are met:
@@ -31,4 +21,3 @@ SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
 CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
