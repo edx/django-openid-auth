@@ -17,6 +17,7 @@ Package: python-django-openid-auth
 Architecture: all
 XB-Python-Version: ${python:Versions}
 Depends: ${python:Depends},
+    ${misc:Depends},
     python-pkg-resources
 Provides: ${python:Provides}
 Description: OpenID integration for django.contrib.auth
