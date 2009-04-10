@@ -1,5 +1,6 @@
 Source: python-django-openid-auth
-Maintainer: Elliot Murphy <elliot@caonical.com>
+Maintainer: Ubuntu MOTU Developers <ubuntu-motu@lists.ubuntu.com>
+XSBC-Original-Maintainer: Elliot Murphy <elliot@canonical.com>
 Uploaders: James Henstridge <jamesh@canonical.com>
 Section: python
 Priority: optional

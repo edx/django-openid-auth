@@ -1,4 +1,4 @@
-python-django-openid-auth (0.1) hardy; urgency=low
+python-django-openid-auth (0.1ubuntu0) jaunty; urgency=low
 
   * Initial release.
 
