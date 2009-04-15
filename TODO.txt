@@ -1,6 +1,0 @@
- * Periodically clean up expired nonces.  The cleanupNonces() method
-   is implemented on the store, but it is not called anywhere.
-
- * If we need it, look at implementing the LP teams extension.  We
-   could pretty easily expose the data as permissions via the OpenID
-   authentication backend.
