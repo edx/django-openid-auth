@@ -69,6 +69,6 @@ setup(
         'django_openid_auth.tests',
         ],
     package_data={
-        'django_openid_auth': ['templates/*.html', 'templates/openid/*.html'],
+        'django_openid_auth': ['templates/openid/*.html'],
         },
     )
