@@ -51,7 +51,9 @@ setup(
     description=description,
     long_description=long_description,
     license='BSD',
+    platforms=['any'],
     url='https://launchpad.net/django-openid-auth',
+    download_url='https://launchpad.net/django-openid-auth/+download',
     classifiers=[
         'Development Status :: 4 - Beta',
         'Environment :: Web Environment',
@@ -60,7 +62,7 @@ setup(
         'License :: OSI Approved :: BSD License',
         'Operating System :: OS Independent',
         'Programming Language :: Python',
-        'Topic :: Utilities'
+        'Topic :: Software Development :: Libraries :: Python Modules'
         ],
     packages=[
         'django_openid_auth',
