@@ -1,2 +1,4 @@
 ./django
-MANIFEST
+./MANIFEST
+./build
+./dist
