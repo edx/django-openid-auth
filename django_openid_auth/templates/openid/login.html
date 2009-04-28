@@ -28,8 +28,10 @@ input.openid {
 <form name="fopenid" action="{{ action }}" method="post">
 	<fieldset>
 		<legend>{% trans "Sign In Using Your OpenID" %}</legend>
-        <div class="form-row"><label for="id_openid_identifier">{%
-        trans "OpenID:" %}</label><br />{{ form.openid_identifier }}</div>
+        <div class="form-row">
+            <label for="id_openid_identifier">{% trans "OpenID:" %}</label><br />
+            {{ form.openid_identifier }}
+        </div>
         <div class="submit-row "><input name="bsignin" type="submit" value="{% trans "Sign in" %}"></div>
 
  {% if next %}
