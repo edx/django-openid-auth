@@ -73,4 +73,6 @@ setup(
     package_data={
         'django_openid_auth': ['templates/openid/*.html'],
         },
+    provides=['django_openid_auth'],
+    requires=['django (>=1.0)', 'openid (>=2.2.0)'],
     )
