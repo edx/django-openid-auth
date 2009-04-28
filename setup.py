@@ -43,17 +43,19 @@ from distutils.core import setup
 
 
 description, long_description = __doc__.split('\n\n', 1)
+VERSION = '0.1'
 
 setup(
     name='django-openid-auth',
-    version='0.1',
+    version=VERSION,
     author='Canonical Ltd',
     description=description,
     long_description=long_description,
     license='BSD',
     platforms=['any'],
     url='https://launchpad.net/django-openid-auth',
-    download_url='https://launchpad.net/django-openid-auth/+download',
+    download_url=('http://launchpad.net/django-openid-auth/trunk/%s/+download'
+                  '/django-openid-auth-%s.tar.gz' % (VERSION, VERSION)),
     classifiers=[
         'Development Status :: 4 - Beta',
         'Environment :: Web Environment',
