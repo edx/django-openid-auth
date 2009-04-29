@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # django-openid-auth -  OpenID integration for django.contrib.auth
 #
 # Copyright (C) 2009 Canonical Ltd.
