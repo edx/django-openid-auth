@@ -49,7 +49,7 @@ single signon systems.
  6. Configure the LOGIN_URL and LOGIN_REDIRECT_URL appropriately for
     your site:
 
-        LOGIN_URL = '/openid/login'
+        LOGIN_URL = '/openid/login/'
         LOGIN_REDIRECT_URL = '/'
 
     This will allow pages that use the standard @login_required

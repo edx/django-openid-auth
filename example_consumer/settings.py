@@ -125,5 +125,5 @@ OPENID_UPDATE_DETAILS_FROM_SREG = True
 OPENID_SSO_SERVER_URL = 'https://login.launchpad.net/'
 
 # Tell django.contrib.auth to use the OpenID signin URLs.
-LOGIN_URL = '/openid/login'
+LOGIN_URL = '/openid/login/'
 LOGIN_REDIRECT_URL = '/'
