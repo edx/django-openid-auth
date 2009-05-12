@@ -150,8 +150,8 @@ class RelyingPartyTests(TestCase):
         self.assertEquals(webresponse.code, 302)
         redirect_to = webresponse.headers['location']
         self.assertTrue(redirect_to.startswith(
-                'http://testserver/openid/complete'))
-        return self.client.get('/openid/complete',
+                'http://testserver/openid/complete/'))
+        return self.client.get('/openid/complete/',
             dict(cgi.parse_qsl(redirect_to.split('?', 1)[1])))
 
     def test_login(self):
@@ -163,27 +163,27 @@ class RelyingPartyTests(TestCase):
         useropenid.save()
 
         # The login form is displayed:
-        response = self.client.get('/openid/login')
+        response = self.client.get('/openid/login/')
         self.assertTemplateUsed(response, 'openid/login.html')
 
         # Posting in an identity URL begins the authentication request:
-        response = self.client.post('/openid/login',
+        response = self.client.post('/openid/login/',
             {'openid_identifier': 'http://example.com/identity',
-             'next': '/getuser'})
+             'next': '/getuser/'})
         self.assertContains(response, 'OpenID transaction in progress')
 
         openid_request = self.provider.parseFormPost(response.content)
         self.assertEquals(openid_request.mode, 'checkid_setup')
         self.assertTrue(openid_request.return_to.startswith(
-                'http://testserver/openid/complete'))
+                'http://testserver/openid/complete/'))
 
         # Complete the request.  The user is redirected to the next URL.
         openid_response = openid_request.answer(True)
         response = self.complete(openid_response)
-        self.assertRedirects(response, 'http://testserver/getuser')
+        self.assertRedirects(response, 'http://testserver/getuser/')
 
         # And they are now logged in:
-        response = self.client.get('/getuser')
+        response = self.client.get('/getuser/')
         self.assertEquals(response.content, 'someuser')
 
     def test_login_sso(self):
@@ -197,22 +197,22 @@ class RelyingPartyTests(TestCase):
 
         # Requesting the login form immediately begins an
         # authentication request.
-        response = self.client.get('/openid/login', {'next': '/getuser'})
+        response = self.client.get('/openid/login/', {'next': '/getuser/'})
         self.assertEquals(response.status_code, 200)
         self.assertContains(response, 'OpenID transaction in progress')
 
         openid_request = self.provider.parseFormPost(response.content)
         self.assertEquals(openid_request.mode, 'checkid_setup')
         self.assertTrue(openid_request.return_to.startswith(
-                'http://testserver/openid/complete'))
+                'http://testserver/openid/complete/'))
 
         # Complete the request.  The user is redirected to the next URL.
         openid_response = openid_request.answer(True)
         response = self.complete(openid_response)
-        self.assertRedirects(response, 'http://testserver/getuser')
+        self.assertRedirects(response, 'http://testserver/getuser/')
 
         # And they are now logged in:
-        response = self.client.get('/getuser')
+        response = self.client.get('/getuser/')
         self.assertEquals(response.content, 'someuser')
 
     def test_login_create_users(self):
@@ -221,9 +221,9 @@ class RelyingPartyTests(TestCase):
         User.objects.create_user('someuser', 'someone@example.com')
 
         # Posting in an identity URL begins the authentication request:
-        response = self.client.post('/openid/login',
+        response = self.client.post('/openid/login/',
             {'openid_identifier': 'http://example.com/identity',
-             'next': '/getuser'})
+             'next': '/getuser/'})
         self.assertContains(response, 'OpenID transaction in progress')
 
         # Complete the request, passing back some simple registration
@@ -236,11 +236,11 @@ class RelyingPartyTests(TestCase):
                            'email': 'foo@example.com'})
         openid_response.addExtension(sreg_response)
         response = self.complete(openid_response)
-        self.assertRedirects(response, 'http://testserver/getuser')
+        self.assertRedirects(response, 'http://testserver/getuser/')
 
         # And they are now logged in as a new user (they haven't taken
         # over the existing "someuser" user).
-        response = self.client.get('/getuser')
+        response = self.client.get('/getuser/')
         self.assertEquals(response.content, 'someuser2')
 
         # Check the details of the new user.
@@ -259,9 +259,9 @@ class RelyingPartyTests(TestCase):
         useropenid.save()
 
         # Posting in an identity URL begins the authentication request:
-        response = self.client.post('/openid/login',
+        response = self.client.post('/openid/login/',
             {'openid_identifier': 'http://example.com/identity',
-             'next': '/getuser'})
+             'next': '/getuser/'})
         self.assertContains(response, 'OpenID transaction in progress')
 
         # Complete the request, passing back some simple registration
@@ -274,11 +274,11 @@ class RelyingPartyTests(TestCase):
                            'email': 'foo@example.com'})
         openid_response.addExtension(sreg_response)
         response = self.complete(openid_response)
-        self.assertRedirects(response, 'http://testserver/getuser')
+        self.assertRedirects(response, 'http://testserver/getuser/')
 
         # And they are now logged in as testuser (the passed in
         # nickname has not caused the username to change).
-        response = self.client.get('/getuser')
+        response = self.client.get('/getuser/')
         self.assertEquals(response.content, 'testuser')
 
         # The user's full name and email have been updated.
@@ -304,9 +304,9 @@ class RelyingPartyTests(TestCase):
         useropenid.save()
 
         # Posting in an identity URL begins the authentication request:
-        response = self.client.post('/openid/login',
+        response = self.client.post('/openid/login/',
             {'openid_identifier': 'http://example.com/identity',
-             'next': '/getuser'})
+             'next': '/getuser/'})
         self.assertContains(response, 'OpenID transaction in progress')
 
         # Complete the request
@@ -317,10 +317,10 @@ class RelyingPartyTests(TestCase):
             teams_request, 'teamname,some-other-team')
         openid_response.addExtension(teams_response)
         response = self.complete(openid_response)
-        self.assertRedirects(response, 'http://testserver/getuser')
+        self.assertRedirects(response, 'http://testserver/getuser/')
 
         # And they are now logged in as testuser
-        response = self.client.get('/getuser')
+        response = self.client.get('/getuser/')
         self.assertEquals(response.content, 'testuser')
 
         # The user's groups have been updated.
