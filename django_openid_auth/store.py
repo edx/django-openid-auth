@@ -42,13 +42,22 @@ class DjangoOpenIDStore(OpenIDStore):
         self.max_nonce_age = 6 * 60 * 60 # Six hours
 
     def storeAssociation(self, server_url, association):
-        assoc = Association(
-            server_url=server_url,
-            handle=association.handle,
-            secret=base64.encodestring(association.secret),
-            issued=association.issued,
-            lifetime=association.lifetime,
-            assoc_type=association.assoc_type)
+        try:
+            assoc = Association.objects.get(
+                server_url=server_url, handle=association.handle)
+        except Association.DoesNotExist:
+            assoc = Association(
+                server_url=server_url,
+                handle=association.handle,
+                secret=base64.encodestring(association.secret),
+                issued=association.issued,
+                lifetime=association.lifetime,
+                assoc_type=association.assoc_type)
+        else:
+            assoc.secret = base64.encodestring(association.secret)
+            assoc.issued = association.issued
+            assoc.lifetime = association.lifetime
+            assoc.assoc_type = association.assoc_type
         assoc.save()
 
     def getAssociation(self, server_url, handle=None):

@@ -56,6 +56,20 @@ class OpenIDStoreTests(TestCase):
         self.assertEquals(dbassoc.lifetime, 600)
         self.assertEquals(dbassoc.assoc_type, 'HMAC-SHA1')
 
+    def test_storeAssociation_update_existing(self):
+        assoc = OIDAssociation('handle', 'secret', 42, 600, 'HMAC-SHA1')
+        self.store.storeAssociation('server-url', assoc)
+
+        # Now update the association with new information.
+        assoc = OIDAssociation('handle', 'secret2', 420, 900, 'HMAC-SHA256')
+        self.store.storeAssociation('server-url', assoc)
+        dbassoc = Association.objects.get(
+            server_url='server-url', handle='handle')
+        self.assertEqual(dbassoc.secret, 'secret2'.encode('base-64'))
+        self.assertEqual(dbassoc.issued, 420)
+        self.assertEqual(dbassoc.lifetime, 900)
+        self.assertEqual(dbassoc.assoc_type, 'HMAC-SHA256')
+
     def test_getAssociation(self):
         timestamp = int(time.time())
         self.store.storeAssociation(
@@ -104,9 +118,6 @@ class OpenIDStoreTests(TestCase):
         self.assertEquals(assoc.issued, timestamp + 1)
 
     def test_removeAssociation(self):
-        self.assertEquals(
-            self.store.removeAssociation('server-url', 'unknown'), False)
-
         timestamp = int(time.time())
         self.store.storeAssociation(
             'server-url', OIDAssociation('handle', 'secret', timestamp, 600,
@@ -115,6 +126,10 @@ class OpenIDStoreTests(TestCase):
             self.store.removeAssociation('server-url', 'handle'), True)
         self.assertEquals(
             self.store.getAssociation('server-url', 'handle'), None)
+
+    def test_removeAssociation_unknown(self):
+        self.assertEquals(
+            self.store.removeAssociation('server-url', 'unknown'), False)
 
     def test_useNonce(self):
         timestamp = time.time()
