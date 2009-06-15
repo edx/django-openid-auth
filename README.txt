@@ -8,7 +8,14 @@ single signon systems.
 
 == Basic Installation ==
 
- 1. Add 'django_auth_openid' to INSTALLED_APPS for your application.
+ 1. Install the Jan Rain Python OpenID library.  It can be found at:
+
+        http://openidenabled.com/python-openid/
+
+    It can also be found in most Linux distributions packaged as
+    "python-openid".  You will need version 2.2.0 or later.
+
+ 2. Add 'django_auth_openid' to INSTALLED_APPS for your application.
     At a minimum, you'll need the following in there:
 
         INSTALLED_APPS = (
@@ -18,7 +25,7 @@ single signon systems.
             'django_openid_auth',
         )
 
- 2. Add 'django_auth_openid.auth.OpenIDBackend' to
+ 3. Add 'django_auth_openid.auth.OpenIDBackend' to
     AUTHENTICATION_BACKENDS.  This should be in addition to the
     default ModelBackend:
 
@@ -27,17 +34,17 @@ single signon systems.
             'django.contrib.auth.backends.ModelBackend',
         )
 
- 3. To create users automatically when a new OpenID is used, add the
+ 4. To create users automatically when a new OpenID is used, add the
     following to the settings:
 
         OPENID_CREATE_USERS = True
 
- 4. To have user details updated from OpenID Simple Registration data
+ 5. To have user details updated from OpenID Simple Registration data
     each time they log in, add the following:
 
         OPENID_UPDATE_DETAILS_FROM_SREG = True
 
- 5. Hook up the login URLs to your application's urlconf with
+ 6. Hook up the login URLs to your application's urlconf with
     something like:
 
         urlpatterns = patterns('',
@@ -46,7 +53,7 @@ single signon systems.
             ...
         )
 
- 6. Configure the LOGIN_URL and LOGIN_REDIRECT_URL appropriately for
+ 7. Configure the LOGIN_URL and LOGIN_REDIRECT_URL appropriately for
     your site:
 
         LOGIN_URL = '/openid/login/'
@@ -55,7 +62,7 @@ single signon systems.
     This will allow pages that use the standard @login_required
     decorator to use the OpenID login page.
 
- 7. Rerun "python manage.py syncdb" to add the UserOpenID table to
+ 8. Rerun "python manage.py syncdb" to add the UserOpenID table to
     your database.
 
 
