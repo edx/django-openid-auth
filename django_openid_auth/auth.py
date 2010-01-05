@@ -158,7 +158,16 @@ class OpenIDBackend:
         user.save()
 
     def update_groups_from_teams(self, user, teams_response):
+        teams_mapping_auto = getattr(settings, 'OPENID_LAUNCHPAD_TEAMS_MAPPING_AUTO', False)
+        teams_mapping_auto_blacklist = getattr(settings, 'OPENID_LAUNCHPAD_TEAMS_MAPPING_AUTO_BLACKLIST', [])
         teams_mapping = getattr(settings, 'OPENID_LAUNCHPAD_TEAMS_MAPPING', {})
+        if teams_mapping_auto:
+            #ignore teams_mapping. use all django-groups
+            teams_mapping = dict()
+            all_groups = Group.objects.exclude(name__in=teams_mapping_auto_blacklist)
+            for group in all_groups:
+                teams_mapping[group.name] = group.name
+
         if len(teams_mapping) == 0:
             return
 

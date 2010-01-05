@@ -33,6 +33,7 @@ import urllib
 from django.conf import settings
 from django.contrib.auth import (
     REDIRECT_FIELD_NAME, authenticate, login as auth_login)
+from django.contrib.auth.models import Group
 from django.core.urlresolvers import reverse
 from django.http import HttpResponse, HttpResponseRedirect
 from django.shortcuts import render_to_response
@@ -148,7 +149,16 @@ def login_begin(request, template_name='openid/login.html',
         sreg.SRegRequest(optional=['email', 'fullname', 'nickname']))
 
     # Request team info
+    teams_mapping_auto = getattr(settings, 'OPENID_LAUNCHPAD_TEAMS_MAPPING_AUTO', False)
+    teams_mapping_auto_blacklist = getattr(settings, 'OPENID_LAUNCHPAD_TEAMS_MAPPING_AUTO_BLACKLIST', [])
     launchpad_teams = getattr(settings, 'OPENID_LAUNCHPAD_TEAMS_MAPPING', {})
+    if teams_mapping_auto:
+        #ignore launchpad teams. use all django-groups
+        launchpad_teams = dict()
+        all_groups = Group.objects.exclude(name__in=teams_mapping_auto_blacklist)
+        for group in all_groups:
+            launchpad_teams[group.name] = group.name
+
     if launchpad_teams:
         openid_request.addExtension(teams.TeamsRequest(launchpad_teams.keys()))
 
