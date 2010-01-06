@@ -97,3 +97,12 @@ Django group memberships.  It can be configured with:
 
 When a user logs in, they will be added or removed from the relevant
 teams listed in the mapping.
+
+If you have already django-groups and want to map these groups automatically, you can use the OPENID_LAUNCHPAD_TEAMS_MAPPING_AUTO variable in your settings.py file.
+
+	OPENID_LAUNCHPAD_TEAMS_MAPPING_AUTO = True
+
+If you use OPENID_LAUNCHPAD_TEAMS_MAPPING_AUTO, the variable OPENID_LAUNCHPAD_TEAMS_MAPPING will be ignored.
+If you want to exclude some groups from the auto mapping, use OPENID_LAUNCHPAD_TEAMS_MAPPING_AUTO_BLACKLIST. This variable has only an effect if OPENID_LAUNCHPAD_TEAMS_MAPPING_AUTO is True.
+
+	OPENID_LAUNCHPAD_TEAMS_MAPPING_AUTO_BLACKLIST = ['django-group1', 'django-group2']

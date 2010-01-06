@@ -328,6 +328,39 @@ class RelyingPartyTests(TestCase):
         self.assertTrue(group in user.groups.all())
         self.assertTrue(ogroup not in user.groups.all())
 
+    def test_login_teams_automapping(self):
+        settings.OPENID_LAUNCHPAD_TEAMS_MAPPING = {'teamname': 'groupname',
+                                                   'otherteam': 'othergroup'}
+        settings.OPENID_LAUNCHPAD_TEAMS_MAPPING_AUTO = True
+        settings.OPENID_LAUNCHPAD_TEAMS_MAPPING_AUTO_BLACKLIST = ['django-group1', 'django-group2']
+        user = User.objects.create_user('testuser', 'someone@example.com')
+        group1 = Group(name='django-group1')
+        group1.save()
+        group2 = Group(name='django-group2')
+        group2.save()
+        group3 = Group(name='django-group3')
+        group3.save()
+        user.save()
+        useropenid = UserOpenID(
+            user=user,
+            claimed_id='http://example.com/identity',
+            display_id='http://example.com/identity')
+        useropenid.save()
+
+        # Posting in an identity URL begins the authentication request:
+        response = self.client.post('/openid/login/',
+            {'openid_identifier': 'http://example.com/identity',
+             'next': '/getuser/'})
+        self.assertContains(response, 'OpenID transaction in progress')
+
+        # Complete the request
+        openid_request = self.provider.parseFormPost(response.content)
+        openid_response = openid_request.answer(True)
+        teams_request = teams.TeamsRequest.fromOpenIDRequest(openid_request)
+        
+        self.assertEqual(group1 in user.groups.all(), False)
+        self.assertEqual(group2 in user.groups.all(), False)
+        self.assertTrue(group3 not in user.groups.all())
 
 def suite():
     return unittest.TestLoader().loadTestsFromName(__name__)
