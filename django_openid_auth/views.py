@@ -29,6 +29,7 @@
 
 import re
 import urllib
+from urlparse import urlsplit
 
 from django.conf import settings
 from django.contrib.auth import (
@@ -64,7 +65,21 @@ def sanitise_redirect_url(redirect_to):
     """Sanitise the redirection URL."""
     # Light security check -- make sure redirect_to isn't garbage.
     if not redirect_to or '//' in redirect_to or ' ' in redirect_to:
-        redirect_to = settings.LOGIN_REDIRECT_URL
+        # Allow the redirect URL to be external if it's a permitted domain
+        allowed_domains = getattr(settings, 
+            "ALLOWED_EXTERNAL_OPENID_REDIRECT_DOMAINS", [])
+        s, netloc, p, q, f = urlsplit(redirect_to)
+        # allow it if netloc is blank or if the domain is allowed
+        if netloc:
+            # a domain was specified. Is it an allowed domain?
+            if netloc.find(":") != -1:
+                netloc, _ = netloc.split(":", 1)
+            if netloc not in allowed_domains:
+                redirect_to = settings.LOGIN_REDIRECT_URL
+        else:
+            # netloc is blank, so it's a local URL (possibly with another URL
+            # passed in the querystring. Allow it.)
+            pass
     return redirect_to
 
 
