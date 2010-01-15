@@ -43,6 +43,7 @@ from openid.store.memstore import MemoryStore
 
 from django_openid_auth import teams
 from django_openid_auth.models import UserOpenID
+from django_openid_auth.views import sanitise_redirect_url
 
 
 ET = importElementTree()
@@ -362,5 +363,28 @@ class RelyingPartyTests(TestCase):
         self.assertEqual(group2 in user.groups.all(), False)
         self.assertTrue(group3 not in user.groups.all())
 
+class HelperFunctionsTest(TestCase):
+    def test_sanitise_redirect_url(self):
+        settings.ALLOWED_EXTERNAL_OPENID_REDIRECT_DOMAINS = [
+            "example.com", "example.org"]
+        # list of URLs and whether they should be passed or not
+        urls = [
+            ("http://example.com", True),
+            ("http://example.org/", True),
+            ("http://example.org/foo/bar", True),
+            ("http://example.org/foo/bar?baz=quux", True),
+            ("http://example.org:9999/foo/bar?baz=quux", True),
+            ("http://www.example.org/", False),
+            ("http://example.net/foo/bar?baz=quux", False),
+            ("/somewhere/local", True),
+            ("/somewhere/local?url=http://fail.com/bar", True),
+        ]
+        for url, returns_self in urls:
+            sanitised = sanitise_redirect_url(url)
+            if returns_self:
+                self.assertEqual(url, sanitised)
+            else:
+                self.assertEqual(settings.LOGIN_REDIRECT_URL, sanitised)
+        
 def suite():
     return unittest.TestLoader().loadTestsFromName(__name__)
