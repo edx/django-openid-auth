@@ -115,3 +115,12 @@ By default, redirecting back to an external URL after auth is forbidden. To perm
 
 and redirects to external URLs on those domains will additionally be permitted.
 
+== Use as /admin (django.admin.contrib) login ==
+
+If you require openid authentication into the admin application, add the following setting:
+
+        OPENID_USE_AS_ADMIN_LOGIN = True
+
+It is worth noting that a user needs to be be marked as a "staff user" to be able to access the admin interface.  A new openid user will not normally be a "staff user".  
+The easiest way to resolve this is to use traditional authentication (OPENID_USE_AS_ADMIN_LOGIN = False) to sign in as your first user with a password and authorise your 
+openid user to be staff.

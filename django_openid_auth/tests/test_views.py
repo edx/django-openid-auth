@@ -129,17 +129,20 @@ class RelyingPartyTests(TestCase):
         self.old_update_details = getattr(settings, 'OPENID_UPDATE_DETAILS_FROM_SREG', False)
         self.old_sso_server_url = getattr(settings, 'OPENID_SSO_SERVER_URL')
         self.old_teams_map = getattr(settings, 'OPENID_LAUNCHPAD_TEAMS_MAPPING', {})
+        self.old_use_as_admin_login = getattr(settings, 'OPENID_USE_AS_ADMIN_LOGIN', False)
 
         settings.OPENID_CREATE_USERS = False
         settings.OPENID_UPDATE_DETAILS_FROM_SREG = False
         settings.OPENID_SSO_SERVER_URL = None
         settings.OPENID_LAUNCHPAD_TEAMS_MAPPING = {}
+        settings.OPENID_USE_AS_ADMIN_LOGIN = False
 
     def tearDown(self):
         settings.OPENID_CREATE_USERS = self.old_create_users
         settings.OPENID_UPDATE_DETAILS_FROM_SREG = self.old_update_details
         settings.OPENID_SSO_SERVER_URL = self.old_sso_server_url
         settings.OPENID_LAUNCHPAD_TEAMS_MAPPING = self.old_teams_map
+        settings.OPENID_USE_AS_ADMIN_LOGIN = self.old_use_as_admin_login
 
         setDefaultFetcher(None)
         super(RelyingPartyTests, self).tearDown()
