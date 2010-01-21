@@ -27,11 +27,48 @@
 # ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+import settings
 from django import forms
+from django.contrib.auth.admin import UserAdmin
+from django.contrib.auth.forms import UserChangeForm
+from django.contrib.auth.models import Group
 from django.utils.translation import ugettext as _
 from django.conf import settings
 
 from openid.yadis import xri
+
+
+def teams_new_unicode(self):
+    """
+    Replacement for Group.__unicode__()
+    Calls original method to chain results
+    """
+    name = self.unicode_before_teams()
+    teams_mapping = getattr(settings, 'OPENID_LAUNCHPAD_TEAMS_MAPPING', {})
+    group_teams = [t for t in teams_mapping if teams_mapping[t] == self.name]
+    if len(group_teams) > 0:
+        return "%s -> %s" % (name, ", ".join(group_teams))
+    else:
+        return name
+Group.unicode_before_teams = Group.__unicode__
+Group.__unicode__ = teams_new_unicode
+
+
+class UserChangeFormWithTeamRestriction(UserChangeForm):
+    """
+    Extends UserChangeForm to add teams awareness to the user admin form
+    """
+    def clean_groups(self):
+        data = self.cleaned_data['groups']
+        teams_mapping = getattr(settings, 'OPENID_LAUNCHPAD_TEAMS_MAPPING', {})
+        known_teams = teams_mapping.values()
+        user_groups = self.instance.groups.all()
+        for group in data:
+            if group.name in known_teams and group not in user_groups:
+                raise forms.ValidationError("""The group %s is mapped to an
+                    external team.  You cannot assign it manually.""" % group.name)
+        return data
+UserAdmin.form = UserChangeFormWithTeamRestriction
 
 
 class OpenIDLoginForm(forms.Form):
