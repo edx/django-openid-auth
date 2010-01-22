@@ -2,6 +2,7 @@
 #
 # Copyright (C) 2007 Simon Willison
 # Copyright (C) 2008-2009 Canonical Ltd.
+# Copyright (C) 2010 Dave Walker
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -26,3 +27,26 @@
 # LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
 # ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
+
+""" Support for allowing openid authentication for /admin (django.contrib.admin) """
+
+from django.conf import settings
+
+if getattr(settings, 'OPENID_USE_AS_ADMIN_LOGIN', False):
+    from django.http import HttpResponseRedirect
+    from django.contrib.admin import sites
+    from django_openid_auth import views
+
+    def _openid_login(self, request, error_message='', extra_context=None):
+        if request.user.is_authenticated():
+            if not request.user.is_staff:
+                return views.render_failure(request, "User %s does not have admin access." 
+                    % request.user.username)
+            return views.render_failure(request, "Unknown Error: %s" % error_message)
+        else:
+            # Redirect to openid login path,
+            return HttpResponseRedirect(settings.LOGIN_URL+"?next="+request.get_full_path())
+        
+    # Overide the standard admin login form. 
+    sites.AdminSite.display_login_form = _openid_login
+
