@@ -1,6 +1,7 @@
 # django-openid-auth -  OpenID integration for django.contrib.auth
 #
 # Copyright (C) 2008-2009 Canonical Ltd.
+# Copyright (C) 2010 Dave Walker
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -26,6 +27,7 @@
 # ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+from django.conf import settings
 from django.contrib import admin
 from django_openid_auth.models import Nonce, Association, UserOpenID
 from django_openid_auth.store import DjangoOpenIDStore
@@ -64,3 +66,25 @@ class UserOpenIDAdmin(admin.ModelAdmin):
     search_fields = ('claimed_id',)
 
 admin.site.register(UserOpenID, UserOpenIDAdmin)
+
+
+# Support for allowing openid authentication for /admin (django.contrib.admin)
+if getattr(settings, 'OPENID_USE_AS_ADMIN_LOGIN', False):
+    from django.http import HttpResponseRedirect
+    from django_openid_auth import views
+
+    def _openid_login(self, request, error_message='', extra_context=None):
+        if request.user.is_authenticated():
+            if not request.user.is_staff:
+                return views.render_failure(
+                    request, "User %s does not have admin access."
+                    % request.user.username)
+            return views.render_failure(
+                request, "Unknown Error: %s" % error_message)
+        else:
+            # Redirect to openid login path,
+            return HttpResponseRedirect(
+                settings.LOGIN_URL + "?next=" + request.get_full_path())
+
+    # Overide the standard admin login form.
+    admin.sites.AdminSite.display_login_form = _openid_login
