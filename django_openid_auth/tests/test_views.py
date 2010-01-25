@@ -381,6 +381,9 @@ class HelperFunctionsTest(TestCase):
             ("http://example.net/foo/bar?baz=quux", False),
             ("/somewhere/local", True),
             ("/somewhere/local?url=http://fail.com/bar", True),
+            # An empty path, as seen when no "next" parameter is passed.
+            ("", False),
+            ("/path with spaces", False),
         ]
         for url, returns_self in urls:
             sanitised = sanitise_redirect_url(url)
