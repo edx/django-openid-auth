@@ -126,6 +126,7 @@ class RelyingPartyTests(TestCase):
         self.provider = StubOpenIDProvider('http://example.com/')
         setDefaultFetcher(self.provider, wrap_exceptions=False)
 
+        self.old_login_redirect_url = getattr(settings, 'LOGIN_REDIRECT_URL', '/accounts/profile/')
         self.old_create_users = getattr(settings, 'OPENID_CREATE_USERS', False)
         self.old_update_details = getattr(settings, 'OPENID_UPDATE_DETAILS_FROM_SREG', False)
         self.old_sso_server_url = getattr(settings, 'OPENID_SSO_SERVER_URL')
@@ -139,6 +140,7 @@ class RelyingPartyTests(TestCase):
         settings.OPENID_USE_AS_ADMIN_LOGIN = False
 
     def tearDown(self):
+        settings.LOGIN_REDIRECT_URL = self.old_login_redirect_url
         settings.OPENID_CREATE_USERS = self.old_create_users
         settings.OPENID_UPDATE_DETAILS_FROM_SREG = self.old_update_details
         settings.OPENID_SSO_SERVER_URL = self.old_sso_server_url
@@ -189,6 +191,31 @@ class RelyingPartyTests(TestCase):
         # And they are now logged in:
         response = self.client.get('/getuser/')
         self.assertEquals(response.content, 'someuser')
+
+    def test_login_no_next(self):
+        """Logins with no next parameter redirect to LOGIN_REDIRECT_URL."""
+        user = User.objects.create_user('someuser', 'someone@example.com')
+        useropenid = UserOpenID(
+            user=user,
+            claimed_id='http://example.com/identity',
+            display_id='http://example.com/identity')
+        useropenid.save()
+
+        settings.LOGIN_REDIRECT_URL = '/getuser/'
+        response = self.client.post('/openid/login/',
+            {'openid_identifier': 'http://example.com/identity'})
+        self.assertContains(response, 'OpenID transaction in progress')
+
+        openid_request = self.provider.parseFormPost(response.content)
+        self.assertEquals(openid_request.mode, 'checkid_setup')
+        self.assertTrue(openid_request.return_to.startswith(
+                'http://testserver/openid/complete/'))
+
+        # Complete the request.  The user is redirected to the next URL.
+        openid_response = openid_request.answer(True)
+        response = self.complete(openid_response)
+        self.assertRedirects(
+            response, 'http://testserver' + settings.LOGIN_REDIRECT_URL)
 
     def test_login_sso(self):
         settings.OPENID_SSO_SERVER_URL = 'http://example.com/identity'
@@ -381,6 +408,9 @@ class HelperFunctionsTest(TestCase):
             ("http://example.net/foo/bar?baz=quux", False),
             ("/somewhere/local", True),
             ("/somewhere/local?url=http://fail.com/bar", True),
+            # An empty path, as seen when no "next" parameter is passed.
+            ("", False),
+            ("/path with spaces", False),
         ]
         for url, returns_self in urls:
             sanitised = sanitise_redirect_url(url)

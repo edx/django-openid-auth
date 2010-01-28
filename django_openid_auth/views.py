@@ -64,7 +64,10 @@ def is_valid_next_url(next):
 def sanitise_redirect_url(redirect_to):
     """Sanitise the redirection URL."""
     # Light security check -- make sure redirect_to isn't garbage.
-    if not redirect_to or '//' in redirect_to or ' ' in redirect_to:
+    is_valid = True
+    if not redirect_to or ' ' in redirect_to:
+        is_valid = False
+    elif '//' in redirect_to:
         # Allow the redirect URL to be external if it's a permitted domain
         allowed_domains = getattr(settings, 
             "ALLOWED_EXTERNAL_OPENID_REDIRECT_DOMAINS", [])
@@ -75,11 +78,12 @@ def sanitise_redirect_url(redirect_to):
             if netloc.find(":") != -1:
                 netloc, _ = netloc.split(":", 1)
             if netloc not in allowed_domains:
-                redirect_to = settings.LOGIN_REDIRECT_URL
-        else:
-            # netloc is blank, so it's a local URL (possibly with another URL
-            # passed in the querystring. Allow it.)
-            pass
+                is_valid = False
+
+    # If the return_to URL is not valid, use the default.
+    if not is_valid:
+        redirect_to = settings.LOGIN_REDIRECT_URL
+
     return redirect_to
 
 
