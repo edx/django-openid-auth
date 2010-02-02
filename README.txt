@@ -15,7 +15,7 @@ single signon systems.
     It can also be found in most Linux distributions packaged as
     "python-openid".  You will need version 2.2.0 or later.
 
- 2. Add 'django_auth_openid' to INSTALLED_APPS for your application.
+ 2. Add 'django_openid_auth' to INSTALLED_APPS for your application.
     At a minimum, you'll need the following in there:
 
         INSTALLED_APPS = (
