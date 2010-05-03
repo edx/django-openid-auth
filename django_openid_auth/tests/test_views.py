@@ -34,8 +34,7 @@ import unittest
 from django.conf import settings
 from django.contrib.auth.models import User, Group
 from django.test import TestCase
-from openid.extensions import ax
-from openid.extensions.sreg import SRegRequest, SRegResponse
+from openid.extensions import ax, sreg
 from openid.fetchers import (
     HTTPFetcher, HTTPFetchingError, HTTPResponse, setDefaultFetcher)
 from openid.oidutil import importElementTree
@@ -263,9 +262,9 @@ class RelyingPartyTests(TestCase):
         # Complete the request, passing back some simple registration
         # data.  The user is redirected to the next URL.
         openid_request = self.provider.parseFormPost(response.content)
-        sreg_request = SRegRequest.fromOpenIDRequest(openid_request)
+        sreg_request = sreg.SRegRequest.fromOpenIDRequest(openid_request)
         openid_response = openid_request.answer(True)
-        sreg_response = SRegResponse.extractResponse(
+        sreg_response = sreg.SRegResponse.extractResponse(
             sreg_request, {'nickname': 'someuser', 'fullname': 'Some User',
                            'email': 'foo@example.com'})
         openid_response.addExtension(sreg_response)
@@ -301,9 +300,9 @@ class RelyingPartyTests(TestCase):
         # Complete the request, passing back some simple registration
         # data.  The user is redirected to the next URL.
         openid_request = self.provider.parseFormPost(response.content)
-        sreg_request = SRegRequest.fromOpenIDRequest(openid_request)
+        sreg_request = sreg.SRegRequest.fromOpenIDRequest(openid_request)
         openid_response = openid_request.answer(True)
-        sreg_response = SRegResponse.extractResponse(
+        sreg_response = sreg.SRegResponse.extractResponse(
             sreg_request, {'nickname': 'someuser', 'fullname': 'Some User',
                            'email': 'foo@example.com'})
         openid_response.addExtension(sreg_response)
@@ -341,7 +340,7 @@ class RelyingPartyTests(TestCase):
         # The resulting OpenID request uses the Attribute Exchange
         # extension rather than the Simple Registration extension.
         openid_request = self.provider.parseFormPost(response.content)
-        sreg_request = SRegRequest.fromOpenIDRequest(openid_request)
+        sreg_request = sreg.SRegRequest.fromOpenIDRequest(openid_request)
         self.assertEqual(sreg_request.required, [])
         self.assertEqual(sreg_request.optional, [])
 
