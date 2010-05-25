@@ -81,7 +81,7 @@ class OpenIDBackend:
 
         if getattr(settings, 'OPENID_UPDATE_DETAILS_FROM_SREG', False):
             details = self._extract_user_details(openid_response)
-            self.update_user_details_from_sreg(user, details)
+            self.update_user_details(user, details)
 
         teams_response = teams.TeamsResponse.fromSuccessResponse(
             openid_response)
@@ -144,7 +144,7 @@ class OpenIDBackend:
             i += 1
 
         user = User.objects.create_user(username, email, password=None)
-        self.update_user_details_from_sreg(user, details)
+        self.update_user_details(user, details)
 
         self.associate_openid(user, openid_response)
         return user
@@ -169,7 +169,7 @@ class OpenIDBackend:
 
         return user_openid
 
-    def update_user_details_from_sreg(self, user, details):
+    def update_user_details(self, user, details):
         updated = False
         if details['first_name']:
             user.first_name = details['first_name']
