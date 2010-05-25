@@ -39,8 +39,9 @@ single signon systems.
 
         OPENID_CREATE_USERS = True
 
- 5. To have user details updated from OpenID Simple Registration data
-    each time they log in, add the following:
+ 5. To have user details updated from OpenID Simple Registration or
+    Attribute Exchange extension data each time they log in, add the
+    following:
 
         OPENID_UPDATE_DETAILS_FROM_SREG = True
 
