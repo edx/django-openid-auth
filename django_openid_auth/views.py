@@ -132,6 +132,7 @@ def parse_openid_response(request):
 
 
 def login_begin(request, template_name='openid/login.html',
+                login_complete='openid-complete',
                 redirect_field_name=REDIRECT_FIELD_NAME):
     """Begin an OpenID login request, possibly asking for an identity URL."""
     redirect_to = request.REQUEST.get(redirect_field_name, '')
