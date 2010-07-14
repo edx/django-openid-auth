@@ -132,7 +132,7 @@ def parse_openid_response(request):
 
 
 def login_begin(request, template_name='openid/login.html',
-                login_complete='openid-complete',
+                login_complete='openid-complete', form=OpenIDLoginForm,
                 redirect_field_name=REDIRECT_FIELD_NAME):
     """Begin an OpenID login request, possibly asking for an identity URL."""
     redirect_to = request.REQUEST.get(redirect_field_name, '')
@@ -143,11 +143,11 @@ def login_begin(request, template_name='openid/login.html',
 
     if openid_url is None:
         if request.POST:
-            login_form = OpenIDLoginForm(data=request.POST)
+            login_form = form(data=request.POST)
             if login_form.is_valid():
                 openid_url = login_form.cleaned_data['openid_identifier']
         else:
-            login_form = OpenIDLoginForm()
+            login_form = form()
 
         # Invalid or no form data:
         if openid_url is None:
