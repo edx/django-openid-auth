@@ -40,6 +40,7 @@ from django.http import HttpResponse, HttpResponseRedirect
 from django.shortcuts import render_to_response
 from django.template import RequestContext
 from django.template.loader import render_to_string
+from django.views.decorators.csrf import csrf_exempt
 
 from openid.consumer.consumer import (
     Consumer, SUCCESS, CANCEL, FAILURE)
@@ -210,6 +211,7 @@ def login_begin(request, template_name='openid/login.html',
     return render_openid_request(request, openid_request, return_to)
 
 
+@csrf_exempt
 def login_complete(request, redirect_field_name=REDIRECT_FIELD_NAME):
     redirect_to = request.REQUEST.get(redirect_field_name, '')
 
