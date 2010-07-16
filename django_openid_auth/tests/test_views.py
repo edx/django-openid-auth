@@ -131,7 +131,7 @@ class RelyingPartyTests(TestCase):
         self.old_login_redirect_url = getattr(settings, 'LOGIN_REDIRECT_URL', '/accounts/profile/')
         self.old_create_users = getattr(settings, 'OPENID_CREATE_USERS', False)
         self.old_update_details = getattr(settings, 'OPENID_UPDATE_DETAILS_FROM_SREG', False)
-        self.old_sso_server_url = getattr(settings, 'OPENID_SSO_SERVER_URL')
+        self.old_sso_server_url = getattr(settings, 'OPENID_SSO_SERVER_URL', None)
         self.old_teams_map = getattr(settings, 'OPENID_LAUNCHPAD_TEAMS_MAPPING', {})
         self.old_use_as_admin_login = getattr(settings, 'OPENID_USE_AS_ADMIN_LOGIN', False)
 
