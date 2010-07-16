@@ -26,6 +26,7 @@ input.openid {
 </p>
 {% endif %}
 <form name="fopenid" action="{{ action }}" method="post">
+    {% csrf_token %}
 	<fieldset>
 		<legend>{% trans "Sign In Using Your OpenID" %}</legend>
         <div class="form-row">
