@@ -30,13 +30,7 @@
 from django.conf.urls.defaults import *
 
 urlpatterns = patterns('django_openid_auth.views',
-    url(r'^login/$',
-        'login_begin',
-        name='openid-login'),
-    url(r'^complete/$',
-        'login_complete',
-        name='openid-complete'),
-    url(r'^logo.gif$',
-        'logo',
-        name='openid-logo'),
+    url(r'^login/$', 'login_begin', name='openid-login'),
+    url(r'^complete/$', 'login_complete', name='openid-complete'),
+    url(r'^logo.gif$', 'logo', name='openid-logo'),
 )
