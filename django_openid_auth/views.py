@@ -40,6 +40,7 @@ from django.http import HttpResponse, HttpResponseRedirect
 from django.shortcuts import render_to_response
 from django.template import RequestContext
 from django.template.loader import render_to_string
+from django.utils.functional import curry
 
 from openid.consumer.consumer import (
     Consumer, SUCCESS, CANCEL, FAILURE)
@@ -111,10 +112,11 @@ def render_openid_request(request, openid_request, return_to, trust_root=None):
         return HttpResponse(form_html, content_type='text/html;charset=UTF-8')
 
 
-def render_failure(request, message, status=403):
+def default_render_failure(request, message, status=403,
+                           template_name='openid/failure.html'):
     """Render an error page to the user."""
     data = render_to_string(
-        'openid/failure.html', dict(message=message),
+        template_name, dict(message=message),
         context_instance=RequestContext(request))
     return HttpResponse(data, status=status)
 
@@ -133,6 +135,7 @@ def parse_openid_response(request):
 
 def login_begin(request, template_name='openid/login.html',
                 login_complete='openid-complete', form=OpenIDLoginForm,
+                render_failure=default_render_failure,
                 redirect_field_name=REDIRECT_FIELD_NAME):
     """Begin an OpenID login request, possibly asking for an identity URL."""
     redirect_to = request.REQUEST.get(redirect_field_name, '')
@@ -211,13 +214,14 @@ def login_begin(request, template_name='openid/login.html',
     return render_openid_request(request, openid_request, return_to)
 
 
-def login_complete(request, redirect_field_name=REDIRECT_FIELD_NAME):
+def login_complete(request, redirect_field_name=REDIRECT_FIELD_NAME,
+                   render_failure=default_render_failure):
     redirect_to = request.REQUEST.get(redirect_field_name, '')
+    render_failure = curry(render_failure, request)
 
     openid_response = parse_openid_response(request)
     if not openid_response:
-        return render_failure(
-            request, 'This is an OpenID relying party endpoint.')
+        return render_failure('This is an OpenID relying party endpoint.')
 
     if openid_response.status == SUCCESS:
         user = authenticate(openid_response=openid_response)
@@ -226,15 +230,14 @@ def login_complete(request, redirect_field_name=REDIRECT_FIELD_NAME):
                 auth_login(request, user)
                 return HttpResponseRedirect(sanitise_redirect_url(redirect_to))
             else:
-                return render_failure(request, 'Disabled account')
+                return render_failure('Disabled account')
         else:
-            return render_failure(request, 'Unknown user')
+            return render_failure('Unknown user')
     elif openid_response.status == FAILURE:
-        return render_failure(
-            request, 'OpenID authentication failed: %s' %
+        return render_failure('OpenID authentication failed: %s' %
             openid_response.message)
     elif openid_response.status == CANCEL:
-        return render_failure(request, 'Authentication cancelled')
+        return render_failure('Authentication cancelled')
     else:
         assert False, (
             "Unknown OpenID response type: %r" % openid_response.status)
