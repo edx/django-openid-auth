@@ -38,7 +38,7 @@ from openid.extensions import ax, sreg
 from openid.fetchers import (
     HTTPFetcher, HTTPFetchingError, HTTPResponse, setDefaultFetcher)
 from openid.oidutil import importElementTree
-from openid.server.server import BROWSER_REQUEST_MODES, Server
+from openid.server.server import BROWSER_REQUEST_MODES, ENCODE_URL, Server
 from openid.store.memstore import MemoryStore
 
 from django_openid_auth import teams
@@ -154,6 +154,9 @@ class RelyingPartyTests(TestCase):
 
     def complete(self, openid_response):
         """Complete an OpenID authentication request."""
+        # The server can generate either a redirect or a form post
+        # here.  For simplicity, force generation of a redirect.
+        openid_response.whichEncoding = lambda: ENCODE_URL
         webresponse = self.provider.server.encodeResponse(openid_response)
         self.assertEquals(webresponse.code, 302)
         redirect_to = webresponse.headers['location']
@@ -355,6 +358,13 @@ class RelyingPartyTests(TestCase):
                 'http://axschema.org/namePerson/last'))
         self.assertTrue(fetch_request.has_key(
                 'http://axschema.org/namePerson/friendly'))
+        # myOpenID compatibilty attributes:
+        self.assertTrue(fetch_request.has_key(
+                'http://schema.openid.net/contact/email'))
+        self.assertTrue(fetch_request.has_key(
+                'http://schema.openid.net/namePerson'))
+        self.assertTrue(fetch_request.has_key(
+                'http://schema.openid.net/namePerson/friendly'))
 
         # Build up a response including AX data.
         openid_response = openid_request.answer(True)
