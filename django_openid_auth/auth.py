@@ -102,6 +102,17 @@ class OpenIDBackend:
         # them in preference.
         fetch_response = ax.FetchResponse.fromSuccessResponse(openid_response)
         if fetch_response:
+            # The myOpenID provider advertises AX support, but uses
+            # attribute names from an obsolete draft of the
+            # specification.  We check for them first so the common
+            # names take precedence.
+            email = fetch_response.getSingle(
+                'http://schema.openid.net/contact/email', email)
+            fullname = fetch_response.getSingle(
+                'http://schema.openid.net/namePerson', fullname)
+            nickname = fetch_response.getSingle(
+                'http://schema.openid.net/namePerson/friendly', nickname)
+
             email = fetch_response.getSingle(
                 'http://axschema.org/contact/email', email)
             fullname = fetch_response.getSingle(

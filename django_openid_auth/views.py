@@ -178,7 +178,7 @@ def login_begin(request, template_name='openid/login.html',
             ('http://axschema.org/namePerson/first', 'firstname'),
             ('http://axschema.org/namePerson/last', 'lastname'),
             ('http://axschema.org/namePerson/friendly', 'nickname'),
-            # The myOpenID provider advertised AX support, but uses
+            # The myOpenID provider advertises AX support, but uses
             # attribute names from an obsolete draft of the
             # specification.  We request them for compatibility.
             ('http://schema.openid.net/contact/email', 'old_email'),
