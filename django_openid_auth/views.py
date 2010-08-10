@@ -112,10 +112,11 @@ def render_openid_request(request, openid_request, return_to, trust_root=None):
         return HttpResponse(form_html, content_type='text/html;charset=UTF-8')
 
 
-def render_failure(request, message, status=403):
+def default_render_failure(request, message, status=403,
+                           template_name='openid/failure.html'):
     """Render an error page to the user."""
     data = render_to_string(
-        'openid/failure.html', dict(message=message),
+        template_name, dict(message=message),
         context_instance=RequestContext(request))
     return HttpResponse(data, status=status)
 
@@ -133,6 +134,9 @@ def parse_openid_response(request):
 
 
 def login_begin(request, template_name='openid/login.html',
+                login_complete_view='openid-complete',
+                form_class=OpenIDLoginForm,
+                render_failure=default_render_failure,
                 redirect_field_name=REDIRECT_FIELD_NAME):
     """Begin an OpenID login request, possibly asking for an identity URL."""
     redirect_to = request.REQUEST.get(redirect_field_name, '')
@@ -143,11 +147,11 @@ def login_begin(request, template_name='openid/login.html',
 
     if openid_url is None:
         if request.POST:
-            login_form = OpenIDLoginForm(data=request.POST)
+            login_form = form_class(data=request.POST)
             if login_form.is_valid():
                 openid_url = login_form.cleaned_data['openid_identifier']
         else:
-            login_form = OpenIDLoginForm()
+            login_form = form_class()
 
         # Invalid or no form data:
         if openid_url is None:
@@ -206,7 +210,7 @@ def login_begin(request, template_name='openid/login.html',
 
     # Construct the request completion URL, including the page we
     # should redirect to.
-    return_to = request.build_absolute_uri(reverse(login_complete))
+    return_to = request.build_absolute_uri(reverse(login_complete_view))
     if redirect_to:
         if '?' in return_to:
             return_to += '&'
@@ -218,7 +222,8 @@ def login_begin(request, template_name='openid/login.html',
 
 
 @csrf_exempt
-def login_complete(request, redirect_field_name=REDIRECT_FIELD_NAME):
+def login_complete(request, redirect_field_name=REDIRECT_FIELD_NAME,
+                   render_failure=default_render_failure):
     redirect_to = request.REQUEST.get(redirect_field_name, '')
 
     openid_response = parse_openid_response(request)
