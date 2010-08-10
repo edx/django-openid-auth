@@ -177,7 +177,13 @@ def login_begin(request, template_name='openid/login.html',
             ('http://axschema.org/namePerson', 'fullname'),
             ('http://axschema.org/namePerson/first', 'firstname'),
             ('http://axschema.org/namePerson/last', 'lastname'),
-            ('http://axschema.org/namePerson/friendly', 'nickname')]:
+            ('http://axschema.org/namePerson/friendly', 'nickname'),
+            # The myOpenID provider advertises AX support, but uses
+            # attribute names from an obsolete draft of the
+            # specification.  We request them for compatibility.
+            ('http://schema.openid.net/contact/email', 'old_email'),
+            ('http://schema.openid.net/namePerson', 'old_fullname'),
+            ('http://schema.openid.net/namePerson/friendly', 'old_nickname')]:
             fetch_request.add(ax.AttrInfo(attr, alias=alias, required=True))
         openid_request.addExtension(fetch_request)
     else:
