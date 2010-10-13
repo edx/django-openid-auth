@@ -191,6 +191,9 @@ class OpenIDBackend:
         if details['email']:
             user.email = details['email']
             updated = True
+        if getattr(settings, 'OPENID_FOLLOW_RENAMES', False):
+            user.username = details['nickname']
+            updated = True
 
         if updated:
             user.save()

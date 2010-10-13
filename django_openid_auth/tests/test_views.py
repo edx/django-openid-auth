@@ -285,6 +285,10 @@ class RelyingPartyTests(TestCase):
         self.assertEquals(user.last_name, 'User')
         self.assertEquals(user.email, 'foo@example.com')
 
+    def test_login_update_details_rename(self):
+        settings.OPENID_FOLLOW_RENAMES = True
+        return self.test_login_update_details()
+        
     def test_login_update_details(self):
         settings.OPENID_UPDATE_DETAILS_FROM_SREG = True
         user = User.objects.create_user('testuser', 'someone@example.com')
@@ -312,13 +316,19 @@ class RelyingPartyTests(TestCase):
         response = self.complete(openid_response)
         self.assertRedirects(response, 'http://testserver/getuser/')
 
-        # And they are now logged in as testuser (the passed in
+        # If OPENID_FOLLOW_RENAMES, they are logged in as 
+        # someuser (the passed in nickname has changed the username)
+        #
+        # Otherwise they are now logged in as testuser (the passed in
         # nickname has not caused the username to change).
         response = self.client.get('/getuser/')
-        self.assertEquals(response.content, 'testuser')
+        if getattr(settings, 'OPENID_FOLLOW_RENAMES', False):
+            self.assertEquals(response.content, 'someuser')
+        else:
+            self.assertEquals(response.content, 'testuser')
 
         # The user's full name and email have been updated.
-        user = User.objects.get(username='testuser')
+        user = User.objects.get(username=response.content)
         self.assertEquals(user.first_name, 'Some')
         self.assertEquals(user.last_name, 'User')
         self.assertEquals(user.email, 'foo@example.com')
