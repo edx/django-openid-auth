@@ -222,6 +222,9 @@ class OpenIDBackend:
             user.groups.add(group)
 
     def update_staff_status_from_teams(self, user, teams_response):
+        if not hasattr(settings, 'OPENID_LAUNCHPAD_STAFF_TEAMS'):
+            return
+
         staff_teams = getattr(settings, 'OPENID_LAUNCHPAD_STAFF_TEAMS', [])
         user.is_staff = False
 
