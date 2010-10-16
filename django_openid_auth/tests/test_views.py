@@ -473,9 +473,8 @@ class RelyingPartyTests(TestCase):
         user.is_staff = True
         user.save()
         self.assertTrue(user.is_staff)
+
         user = self.get_openid_authed_user_with_teams(user, 'teamname,some-other-team')
-        # The user's staff status has been updated.
-        user = User.objects.get(username='testuser')
         self.assertTrue(user.is_staff)
 
     def test_login_teams_staff_assignment(self):
@@ -486,9 +485,6 @@ class RelyingPartyTests(TestCase):
         self.assertFalse(user.is_staff)
 
         user = self.get_openid_authed_user_with_teams(user, 'teamname,some-other-team')
-
-        # The user's staff status has been updated.
-        user = User.objects.get(username='testuser')
         self.assertTrue(user.is_staff)
 
     def test_login_teams_staff_unassignment(self):
@@ -499,9 +495,6 @@ class RelyingPartyTests(TestCase):
         self.assertTrue(user.is_staff)
 
         user = self.get_openid_authed_user_with_teams(user, 'teamname,some-other-team')
-
-        # The user's staff status has been updated.
-        user = User.objects.get(username='testuser')
         self.assertFalse(user.is_staff)
 
     def get_openid_authed_user_with_teams(self, user, teams_str):
@@ -523,6 +516,7 @@ class RelyingPartyTests(TestCase):
             teams_request, teams_str)
         openid_response.addExtension(teams_response)
         response = self.complete(openid_response)
+        return User.objects.get(username=user.username)
 
 
 class HelperFunctionsTest(TestCase):
