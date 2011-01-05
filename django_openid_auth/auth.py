@@ -87,6 +87,7 @@ class OpenIDBackend:
             openid_response)
         if teams_response:
             self.update_groups_from_teams(user, teams_response)
+            self.update_staff_status_from_teams(user, teams_response)
 
         return user
 
@@ -219,3 +220,18 @@ class OpenIDBackend:
             user.groups.remove(group)
         for group in desired_groups - current_groups:
             user.groups.add(group)
+
+    def update_staff_status_from_teams(self, user, teams_response):
+        if not hasattr(settings, 'OPENID_LAUNCHPAD_STAFF_TEAMS'):
+            return
+
+        staff_teams = getattr(settings, 'OPENID_LAUNCHPAD_STAFF_TEAMS', [])
+        user.is_staff = False
+
+        for lp_team in teams_response.is_member:
+            if lp_team in staff_teams:
+                user.is_staff = True
+                break
+
+        user.save()
+

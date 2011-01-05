@@ -462,10 +462,62 @@ class RelyingPartyTests(TestCase):
         openid_request = self.provider.parseFormPost(response.content)
         openid_response = openid_request.answer(True)
         teams_request = teams.TeamsRequest.fromOpenIDRequest(openid_request)
-        
+
         self.assertEqual(group1 in user.groups.all(), False)
         self.assertEqual(group2 in user.groups.all(), False)
         self.assertTrue(group3 not in user.groups.all())
+
+    def test_login_teams_staff_not_defined(self):
+        delattr(settings, 'OPENID_LAUNCHPAD_STAFF_TEAMS')
+        user = User.objects.create_user('testuser', 'someone@example.com')
+        user.is_staff = True
+        user.save()
+        self.assertTrue(user.is_staff)
+
+        user = self.get_openid_authed_user_with_teams(user, 'teamname,some-other-team')
+        self.assertTrue(user.is_staff)
+
+    def test_login_teams_staff_assignment(self):
+        settings.OPENID_LAUNCHPAD_STAFF_TEAMS = ('teamname',)
+        user = User.objects.create_user('testuser', 'someone@example.com')
+        user.is_staff = False
+        user.save()
+        self.assertFalse(user.is_staff)
+
+        user = self.get_openid_authed_user_with_teams(user, 'teamname,some-other-team')
+        self.assertTrue(user.is_staff)
+
+    def test_login_teams_staff_unassignment(self):
+        settings.OPENID_LAUNCHPAD_STAFF_TEAMS = ('different-teamname',)
+        user = User.objects.create_user('testuser', 'someone@example.com')
+        user.is_staff = True
+        user.save()
+        self.assertTrue(user.is_staff)
+
+        user = self.get_openid_authed_user_with_teams(user, 'teamname,some-other-team')
+        self.assertFalse(user.is_staff)
+
+    def get_openid_authed_user_with_teams(self, user, teams_str):
+        useropenid = UserOpenID(
+            user=user,
+            claimed_id='http://example.com/identity',
+            display_id='http://example.com/identity')
+        useropenid.save()
+
+        # Posting in an identity URL begins the authentication request:
+        response = self.client.post('/openid/login/',
+            {'openid_identifier': 'http://example.com/identity'})
+
+        # Complete the request
+        openid_request = self.provider.parseFormPost(response.content)
+        openid_response = openid_request.answer(True)
+        teams_request = teams.TeamsRequest.fromOpenIDRequest(openid_request)
+        teams_response = teams.TeamsResponse.extractResponse(
+            teams_request, teams_str)
+        openid_response.addExtension(teams_response)
+        response = self.complete(openid_response)
+        return User.objects.get(username=user.username)
+
 
 class HelperFunctionsTest(TestCase):
     def test_sanitise_redirect_url(self):
@@ -492,6 +544,6 @@ class HelperFunctionsTest(TestCase):
                 self.assertEqual(url, sanitised)
             else:
                 self.assertEqual(settings.LOGIN_REDIRECT_URL, sanitised)
-        
+
 def suite():
     return unittest.TestLoader().loadTestsFromName(__name__)
