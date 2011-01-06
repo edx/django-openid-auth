@@ -86,6 +86,9 @@ TEMPLATE_LOADERS = (
 #     'django.template.loaders.eggs.load_template_source',
 )
 
+# django-openid-auth will *not* work with Django 1.1.1 or older, as it's
+# missing the csrf_token template tag.  It will work with Lucid's django
+# though, as that has a bunch of backported features from 1.1.2.
 import django
 if float(django.get_version()[:3]) < 1.2:
     csrf_middleware = 'django.contrib.csrf.middleware.CsrfViewMiddleware'
