@@ -86,11 +86,17 @@ TEMPLATE_LOADERS = (
 #     'django.template.loaders.eggs.load_template_source',
 )
 
+import django
+if float(django.get_version()[:3]) < 1.2:
+    csrf_middleware = 'django.contrib.csrf.middleware.CsrfViewMiddleware'
+else:
+    csrf_middleware = 'django.middleware.csrf.CsrfViewMiddleware'
+
 MIDDLEWARE_CLASSES = (
     'django.middleware.common.CommonMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware',
+    csrf_middleware,
 )
 
 ROOT_URLCONF = 'example_consumer.urls'
