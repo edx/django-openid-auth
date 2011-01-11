@@ -60,7 +60,7 @@ next_url_re = re.compile('^/[-\w/]+$')
 def is_valid_next_url(next):
     # When we allow this:
     #   /openid/?next=/welcome/
-    # For security reasons we want to restrict the next= bit to being a local 
+    # For security reasons we want to restrict the next= bit to being a local
     # path, not a complete URL.
     return bool(next_url_re.match(next))
 
@@ -73,7 +73,7 @@ def sanitise_redirect_url(redirect_to):
         is_valid = False
     elif '//' in redirect_to:
         # Allow the redirect URL to be external if it's a permitted domain
-        allowed_domains = getattr(settings, 
+        allowed_domains = getattr(settings,
             "ALLOWED_EXTERNAL_OPENID_REDIRECT_DOMAINS", [])
         s, netloc, p, q, f = urlsplit(redirect_to)
         # allow it if netloc is blank or if the domain is allowed
@@ -194,8 +194,11 @@ def login_begin(request, template_name='openid/login.html',
             fetch_request.add(ax.AttrInfo(attr, alias=alias, required=True))
         openid_request.addExtension(fetch_request)
     else:
+        sreg_optional_fields = ['email', 'fullname', 'nickname']
+        extra_fields = getattr(settings, 'OPENID_SREG_EXTRA_FIELDS', [])
+        sreg_optional_fields.extend(extra_fields)
         openid_request.addExtension(
-            sreg.SRegRequest(optional=['email', 'fullname', 'nickname']))
+            sreg.SRegRequest(optional=sreg_optional_fields))
 
     # Request team info
     teams_mapping_auto = getattr(settings, 'OPENID_LAUNCHPAD_TEAMS_MAPPING_AUTO', False)
