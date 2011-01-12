@@ -27,8 +27,6 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 import cgi
-import re
-import time
 import unittest
 
 from django.conf import settings
@@ -322,6 +320,26 @@ class RelyingPartyTests(TestCase):
         self.assertEquals(user.first_name, 'Some')
         self.assertEquals(user.last_name, 'User')
         self.assertEquals(user.email, 'foo@example.com')
+
+    def test_login_uses_sreg_extra_fields(self):
+        # The configurable sreg attributes are used in the request.
+        settings.OPENID_SREG_EXTRA_FIELDS = ('language',)
+        user = User.objects.create_user('testuser', 'someone@example.com')
+        useropenid = UserOpenID(
+            user=user,
+            claimed_id='http://example.com/identity',
+            display_id='http://example.com/identity')
+        useropenid.save()
+
+        # Posting in an identity URL begins the authentication request:
+        response = self.client.post('/openid/login/',
+            {'openid_identifier': 'http://example.com/identity',
+             'next': '/getuser/'})
+
+        openid_request = self.provider.parseFormPost(response.content)
+        sreg_request = sreg.SRegRequest.fromOpenIDRequest(openid_request)
+        for field in ('email', 'fullname', 'nickname', 'language'):
+            self.assertTrue(field in sreg_request)
 
     def test_login_attribute_exchange(self):
         settings.OPENID_UPDATE_DETAILS_FROM_SREG = True
