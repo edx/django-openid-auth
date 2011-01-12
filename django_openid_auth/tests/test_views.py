@@ -33,6 +33,7 @@ import unittest
 
 from django.conf import settings
 from django.contrib.auth.models import User, Group
+from django.http import HttpRequest
 from django.test import TestCase
 from openid.extensions import ax, sreg
 from openid.fetchers import (
@@ -44,6 +45,7 @@ from openid.store.memstore import MemoryStore
 from django_openid_auth import teams
 from django_openid_auth.models import UserOpenID
 from django_openid_auth.views import sanitise_redirect_url
+from django_openid_auth.signals import oauth_login_complete
 
 
 ET = importElementTree()
@@ -517,6 +519,33 @@ class RelyingPartyTests(TestCase):
         openid_response.addExtension(teams_response)
         response = self.complete(openid_response)
         return User.objects.get(username=user.username)
+
+    def test_login_complete_signals_login(self):
+        # An oauth_login_complete signal is emitted including the
+        # request and sreg_response.
+        user = User.objects.create_user('someuser', 'someone@example.com')
+        useropenid = UserOpenID(
+            user=user,
+            claimed_id='http://example.com/identity',
+            display_id='http://example.com/identity')
+        useropenid.save()
+        response = self.client.post('/openid/login/',
+            {'openid_identifier': 'http://example.com/identity'})
+        openid_request = self.provider.parseFormPost(response.content)
+        openid_response = openid_request.answer(True)
+        # Use a closure to test whether the signal handler was called.
+        self.signal_handler_called = False
+        def login_callback(sender, **kwargs):
+            self.assertTrue(kwargs.has_key('request'))
+            self.assertTrue(kwargs.has_key('sreg_response'))
+            self.assertTrue(isinstance(kwargs['request'], HttpRequest))
+            self.signal_handler_called = True
+        oauth_login_complete.connect(login_callback)
+
+        response = self.complete(openid_response)
+
+        self.assertTrue(self.signal_handler_called)
+        oauth_login_complete.disconnect(login_callback)
 
 
 class HelperFunctionsTest(TestCase):

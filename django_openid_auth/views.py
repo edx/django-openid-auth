@@ -52,6 +52,8 @@ from openid.extensions import sreg, ax
 
 from django_openid_auth import teams
 from django_openid_auth.forms import OpenIDLoginForm
+from django_openid_auth.models import UserOpenID
+from django_openid_auth.signals import oauth_login_complete
 from django_openid_auth.store import DjangoOpenIDStore
 
 
@@ -60,7 +62,7 @@ next_url_re = re.compile('^/[-\w/]+$')
 def is_valid_next_url(next):
     # When we allow this:
     #   /openid/?next=/welcome/
-    # For security reasons we want to restrict the next= bit to being a local 
+    # For security reasons we want to restrict the next= bit to being a local
     # path, not a complete URL.
     return bool(next_url_re.match(next))
 
@@ -73,7 +75,7 @@ def sanitise_redirect_url(redirect_to):
         is_valid = False
     elif '//' in redirect_to:
         # Allow the redirect URL to be external if it's a permitted domain
-        allowed_domains = getattr(settings, 
+        allowed_domains = getattr(settings,
             "ALLOWED_EXTERNAL_OPENID_REDIRECT_DOMAINS", [])
         s, netloc, p, q, f = urlsplit(redirect_to)
         # allow it if netloc is blank or if the domain is allowed
@@ -239,7 +241,15 @@ def login_complete(request, redirect_field_name=REDIRECT_FIELD_NAME,
         if user is not None:
             if user.is_active:
                 auth_login(request, user)
-                return HttpResponseRedirect(sanitise_redirect_url(redirect_to))
+                response = HttpResponseRedirect(sanitise_redirect_url(redirect_to))
+
+                # Notify any listeners that we successfully logged in.
+                sreg_response = sreg.SRegResponse.fromSuccessResponse(
+                    openid_response)
+                oauth_login_complete.send(sender=UserOpenID, request=request,
+                    sreg_response=sreg_response)
+
+                return response
             else:
                 return render_failure(request, 'Disabled account')
         else:
