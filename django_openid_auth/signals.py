@@ -30,5 +30,5 @@
 import django.dispatch
 
 
-oauth_login_complete = django.dispatch.Signal(providing_args=[
-    'request', 'sreg_response'])
+openid_login_complete = django.dispatch.Signal(providing_args=[
+    'request', 'openid_response'])

@@ -33,6 +33,7 @@ from django.conf import settings
 from django.contrib.auth.models import User, Group
 from django.http import HttpRequest
 from django.test import TestCase
+from openid.consumer.consumer import SuccessResponse
 from openid.extensions import ax, sreg
 from openid.fetchers import (
     HTTPFetcher, HTTPFetchingError, HTTPResponse, setDefaultFetcher)
@@ -43,7 +44,7 @@ from openid.store.memstore import MemoryStore
 from django_openid_auth import teams
 from django_openid_auth.models import UserOpenID
 from django_openid_auth.views import sanitise_redirect_url
-from django_openid_auth.signals import oauth_login_complete
+from django_openid_auth.signals import openid_login_complete
 
 
 ET = importElementTree()
@@ -554,16 +555,17 @@ class RelyingPartyTests(TestCase):
         # Use a closure to test whether the signal handler was called.
         self.signal_handler_called = False
         def login_callback(sender, **kwargs):
-            self.assertTrue(kwargs.has_key('request'))
-            self.assertTrue(kwargs.has_key('sreg_response'))
-            self.assertTrue(isinstance(kwargs['request'], HttpRequest))
+            self.assertTrue(isinstance(
+                kwargs.get('request', None), HttpRequest))
+            self.assertTrue(isinstance(
+                kwargs.get('openid_response', None), SuccessResponse))
             self.signal_handler_called = True
-        oauth_login_complete.connect(login_callback)
+        openid_login_complete.connect(login_callback)
 
         response = self.complete(openid_response)
 
         self.assertTrue(self.signal_handler_called)
-        oauth_login_complete.disconnect(login_callback)
+        openid_login_complete.disconnect(login_callback)
 
 
 class HelperFunctionsTest(TestCase):
