@@ -53,7 +53,7 @@ from openid.extensions import sreg, ax
 from django_openid_auth import teams
 from django_openid_auth.forms import OpenIDLoginForm
 from django_openid_auth.models import UserOpenID
-from django_openid_auth.signals import oauth_login_complete
+from django_openid_auth.signals import openid_login_complete
 from django_openid_auth.store import DjangoOpenIDStore
 
 
@@ -247,10 +247,8 @@ def login_complete(request, redirect_field_name=REDIRECT_FIELD_NAME,
                 response = HttpResponseRedirect(sanitise_redirect_url(redirect_to))
 
                 # Notify any listeners that we successfully logged in.
-                sreg_response = sreg.SRegResponse.fromSuccessResponse(
-                    openid_response)
-                oauth_login_complete.send(sender=UserOpenID, request=request,
-                    sreg_response=sreg_response)
+                openid_login_complete.send(sender=UserOpenID, request=request,
+                    openid_response=openid_response)
 
                 return response
             else:
