@@ -131,12 +131,14 @@ class RelyingPartyTests(TestCase):
 
         self.old_login_redirect_url = getattr(settings, 'LOGIN_REDIRECT_URL', '/accounts/profile/')
         self.old_create_users = getattr(settings, 'OPENID_CREATE_USERS', False)
+        self.old_strict_usernames = getattr(settings, 'OPENID_STRICT_USERNAMES', False)
         self.old_update_details = getattr(settings, 'OPENID_UPDATE_DETAILS_FROM_SREG', False)
         self.old_sso_server_url = getattr(settings, 'OPENID_SSO_SERVER_URL', None)
         self.old_teams_map = getattr(settings, 'OPENID_LAUNCHPAD_TEAMS_MAPPING', {})
         self.old_use_as_admin_login = getattr(settings, 'OPENID_USE_AS_ADMIN_LOGIN', False)
 
         settings.OPENID_CREATE_USERS = False
+        settings.OPENID_STRICT_USERNAMES = False
         settings.OPENID_UPDATE_DETAILS_FROM_SREG = False
         settings.OPENID_SSO_SERVER_URL = None
         settings.OPENID_LAUNCHPAD_TEAMS_MAPPING = {}
@@ -145,6 +147,7 @@ class RelyingPartyTests(TestCase):
     def tearDown(self):
         settings.LOGIN_REDIRECT_URL = self.old_login_redirect_url
         settings.OPENID_CREATE_USERS = self.old_create_users
+        settings.OPENID_STRICT_USERNAMES = self.old_strict_usernames
         settings.OPENID_UPDATE_DETAILS_FROM_SREG = self.old_update_details
         settings.OPENID_SSO_SERVER_URL = self.old_sso_server_url
         settings.OPENID_LAUNCHPAD_TEAMS_MAPPING = self.old_teams_map
@@ -285,6 +288,62 @@ class RelyingPartyTests(TestCase):
         self.assertEquals(user.first_name, 'Some')
         self.assertEquals(user.last_name, 'User')
         self.assertEquals(user.email, 'foo@example.com')
+
+    def test_strict_username_no_nickname(self):
+        settings.OPENID_CREATE_USERS = True
+        settings.OPENID_STRICT_USERNAMES = True
+
+        # Posting in an identity URL begins the authentication request:
+        response = self.client.post('/openid/login/',
+            {'openid_identifier': 'http://example.com/identity',
+             'next': '/getuser/'})
+        self.assertContains(response, 'OpenID transaction in progress')
+
+        # Complete the request, passing back some simple registration
+        # data.  The user is redirected to the next URL.
+        openid_request = self.provider.parseFormPost(response.content)
+        sreg_request = sreg.SRegRequest.fromOpenIDRequest(openid_request)
+        openid_response = openid_request.answer(True)
+        sreg_response = sreg.SRegResponse.extractResponse(
+            sreg_request, {'nickname': '', # No nickname
+                           'fullname': 'Some User',
+                           'email': 'foo@example.com'})
+        openid_response.addExtension(sreg_response)
+        response = self.complete(openid_response)
+        
+        # Status code should be 403: Forbidden
+        self.assertEquals(403, response.status_code)
+
+    def test_strict_username_duplicate_user(self):
+        settings.OPENID_CREATE_USERS = True
+        settings.OPENID_STRICT_USERNAMES = True
+        # Create a user with the same name as we'll pass back via sreg.
+        user = User.objects.create_user('someuser', 'someone@example.com')
+        useropenid = UserOpenID(
+            user=user,
+            claimed_id='http://example.com/different_identity',
+            display_id='http://example.com/different_identity')
+        useropenid.save()
+
+        # Posting in an identity URL begins the authentication request:
+        response = self.client.post('/openid/login/',
+            {'openid_identifier': 'http://example.com/identity',
+             'next': '/getuser/'})
+        self.assertContains(response, 'OpenID transaction in progress')
+
+        # Complete the request, passing back some simple registration
+        # data.  The user is redirected to the next URL.
+        openid_request = self.provider.parseFormPost(response.content)
+        sreg_request = sreg.SRegRequest.fromOpenIDRequest(openid_request)
+        openid_response = openid_request.answer(True)
+        sreg_response = sreg.SRegResponse.extractResponse(
+            sreg_request, {'nickname': 'someuser', 'fullname': 'Some User',
+                           'email': 'foo@example.com'})
+        openid_response.addExtension(sreg_response)
+        response = self.complete(openid_response)
+        
+        # Status code should be 403: Forbidden
+        self.assertEquals(403, response.status_code)
 
     def test_login_update_details(self):
         settings.OPENID_UPDATE_DETAILS_FROM_SREG = True
