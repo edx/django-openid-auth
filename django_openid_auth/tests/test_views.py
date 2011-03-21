@@ -405,7 +405,7 @@ class RelyingPartyTests(TestCase):
             claimed_id='http://example.com/identity',
             display_id='http://example.com/identity')
 
-        # identity url is for 'testuser2000'
+        # identity url is for 'testuser2000eight'
         openid_req = {'openid_identifier': 'http://example.com/identity',
                'next': '/getuser/'}
         # but returned username is for 'testuser', which already exists for another identity
@@ -416,8 +416,10 @@ class RelyingPartyTests(TestCase):
 
         # If OPENID_FOLLOW_RENAMES, attempt to change username to 'testuser'
         # but since that username is already taken by someone else, we go through
-        # the process of adding +i to it.  Since the user for this identity url
-        # already has a name matching that pattern, check if first.
+        # the process of adding +i to it.  Even though it looks like the username
+        # follows the nickname+i scheme, it has non-numbers in the suffix, so 
+        # it's not an auto-generated one.  The regular process of renaming to 
+        # 'testuser' has a conflict, so we get +2 at the end.
         self.assertEquals(response.content, 'testuser2')
 
         # The user's full name and email have been updated.
