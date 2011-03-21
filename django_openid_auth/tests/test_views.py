@@ -303,7 +303,6 @@ class RelyingPartyTests(TestCase):
             sreg_request, openid_resp)
         openid_response.addExtension(sreg_response)
         response = self.complete(openid_response)
-#        self.assertEqual(openid_resp, (response.status_code, response.content))
         self.assertRedirects(response, 'http://testserver/getuser/')
 
     def test_login_without_nickname(self):
@@ -381,6 +380,44 @@ class RelyingPartyTests(TestCase):
         # If OPENID_FOLLOW_RENAMES, attempt to change username to 'testuser'
         # but since that username is already taken by someone else, we go through
         # the process of adding +i to it, and get testuser2.
+        self.assertEquals(response.content, 'testuser2')
+
+        # The user's full name and email have been updated.
+        user = User.objects.get(username=response.content)
+        self.assertEquals(user.first_name, 'Rename')
+        self.assertEquals(user.last_name, 'User')
+        self.assertEquals(user.email, 'rename@example.com')
+        
+    def test_login_follow_rename_false_onlyonce(self):
+        settings.OPENID_FOLLOW_RENAMES = True
+        settings.OPENID_UPDATE_DETAILS_FROM_SREG = True
+        # Setup existing user who's name we're going to switch to
+        user = User.objects.create_user('testuser', 'someone@example.com')
+        UserOpenID.objects.get_or_create(
+            user=user,
+            claimed_id='http://example.com/existing_identity',
+            display_id='http://example.com/existing_identity')
+
+        # Setup user who is going to try to change username to 'testuser'
+        renamed_user = User.objects.create_user('testuser2000eight', 'someone@example.com')
+        UserOpenID.objects.get_or_create(
+            user=renamed_user,
+            claimed_id='http://example.com/identity',
+            display_id='http://example.com/identity')
+
+        # identity url is for 'testuser2000'
+        openid_req = {'openid_identifier': 'http://example.com/identity',
+               'next': '/getuser/'}
+        # but returned username is for 'testuser', which already exists for another identity
+        openid_resp =  {'nickname': 'testuser2', 'fullname': 'Rename User',
+                 'email': 'rename@example.com'}
+        self._do_user_login(openid_req, openid_resp)
+        response = self.client.get('/getuser/')
+
+        # If OPENID_FOLLOW_RENAMES, attempt to change username to 'testuser'
+        # but since that username is already taken by someone else, we go through
+        # the process of adding +i to it.  Since the user for this identity url
+        # already has a name matching that pattern, check if first.
         self.assertEquals(response.content, 'testuser2')
 
         # The user's full name and email have been updated.
