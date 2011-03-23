@@ -176,10 +176,6 @@ class OpenIDBackend:
                 username += str(i)
             try:
                 user = User.objects.get(username__exact=username)
-                if user.useropenid_set.filter(claimed_id__exact=identity_url).count() > 0:
-                    # username already belongs to this openid user, so it's okay
-                    return username
-                    
             except User.DoesNotExist:
                 break
             i += 1
