@@ -125,3 +125,13 @@ If you require openid authentication into the admin application, add the followi
 It is worth noting that a user needs to be be marked as a "staff user" to be able to access the admin interface.  A new openid user will not normally be a "staff user".  
 The easiest way to resolve this is to use traditional authentication (OPENID_USE_AS_ADMIN_LOGIN = False) to sign in as your first user with a password and authorise your 
 openid user to be staff.
+
+== Require a valid nickname ==
+
+If you must have a valid, unique nickname in order to create a user accont, add the following setting:
+
+        OPENID_STRICT_USERNAMES = True
+        
+This will cause an OpenID login attempt to fail if the provider does not return a 'nickname' (username) for the user, or if the nickname conflicts with an existing user with a different openid identiy url.
+Without this setting, logins without a nickname will be given the username 'openiduser', and upon conflicts with existing username, an incrementing number will be appended to the username until it is unique.
+
