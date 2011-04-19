@@ -136,3 +136,12 @@ If the new nickname is available as a Django username, the user is renamed.
 Otherwise the user will be renamed to nickname+i for an incrememnting value of i until no conflict occurs.
 If the user has already been renamed to nickname+1 due to a conflict, and the nickname is still not available, the user will keep their existing username.
 
+== Require a valid nickname ==
+
+If you must have a valid, unique nickname in order to create a user accont, add the following setting:
+
+        OPENID_STRICT_USERNAMES = True
+        
+This will cause an OpenID login attempt to fail if the provider does not return a 'nickname' (username) for the user, or if the nickname conflicts with an existing user with a different openid identiy url.
+Without this setting, logins without a nickname will be given the username 'openiduser', and upon conflicts with existing username, an incrementing number will be appended to the username until it is unique.
+

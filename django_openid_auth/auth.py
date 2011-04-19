@@ -42,7 +42,9 @@ from django_openid_auth.models import UserOpenID
 class IdentityAlreadyClaimed(Exception):
     pass
 
-
+class StrictUsernameViolation(Exception):
+    pass
+    
 class OpenIDBackend:
     """A django.contrib.auth backend that authenticates the user based on
     an OpenID response."""
@@ -72,7 +74,10 @@ class OpenIDBackend:
                 claimed_id__exact=openid_response.identity_url)
         except UserOpenID.DoesNotExist:
             if getattr(settings, 'OPENID_CREATE_USERS', False):
-                user = self.create_user_from_openid(openid_response)
+                try:
+                    user = self.create_user_from_openid(openid_response)
+                except StrictUsernameViolation:
+                    return None
         else:
             user = user_openid.user
 
@@ -167,6 +172,12 @@ class OpenIDBackend:
             pass
             
 
+        if getattr(settings, 'OPENID_STRICT_USERNAMES', False):
+            if details['nickname'] is None or details['nickname'] == '':
+                raise StrictUsernameViolation("No username")
+            if User.objects.filter(username__exact=nickname).count() > 0:
+                raise StrictUsernameViolation("Duplicate username: %s" % nickname)
+                
         # Pick a username for the user based on their nickname,
         # checking for conflicts.
         i = 1
