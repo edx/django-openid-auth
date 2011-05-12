@@ -142,7 +142,15 @@ class OpenIDBackend:
                     first_name=first_name, last_name=last_name)
 
     def _get_available_username(self, nickname, identity_url):
+        # If we're being strict about usernames, throw an error if we didn't
+        # get one back from the provider
+        if getattr(settings, 'OPENID_STRICT_USERNAMES', False):
+            if nickname is None or nickname == '':
+                raise StrictUsernameViolation("No username")
+                
+        # If we don't have a nickname, and we're not being strict, use a default
         nickname = nickname or 'openiduser'
+
         # See if we already have this nickname assigned to a username
         try:
             user = User.objects.get(username__exact=nickname)
@@ -173,11 +181,9 @@ class OpenIDBackend:
             
 
         if getattr(settings, 'OPENID_STRICT_USERNAMES', False):
-            if details['nickname'] is None or details['nickname'] == '':
-                raise StrictUsernameViolation("No username")
             if User.objects.filter(username__exact=nickname).count() > 0:
                 raise StrictUsernameViolation("Duplicate username: %s" % nickname)
-                
+
         # Pick a username for the user based on their nickname,
         # checking for conflicts.
         i = 1
