@@ -669,6 +669,7 @@ class RelyingPartyTests(TestCase):
         self.assertEquals(user.email, 'foo@example.com')
 
     def test_login_teams(self):
+        settings.OPENID_LAUNCHPAD_TEAMS_MAPPING_AUTO = False
         settings.OPENID_LAUNCHPAD_TEAMS_MAPPING = {'teamname': 'groupname',
                                                    'otherteam': 'othergroup'}
         user = User.objects.create_user('testuser', 'someone@example.com')
