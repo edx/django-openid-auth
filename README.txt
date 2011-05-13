@@ -145,3 +145,12 @@ If you must have a valid, unique nickname in order to create a user accont, add 
 This will cause an OpenID login attempt to fail if the provider does not return a 'nickname' (username) for the user, or if the nickname conflicts with an existing user with a different openid identiy url.
 Without this setting, logins without a nickname will be given the username 'openiduser', and upon conflicts with existing username, an incrementing number will be appended to the username until it is unique.
 
+== Require Physical Multi-Factor Authentication ==
+
+If your users should use a physical multi-factor authentication method, such as RSA tokens or YubiKey, add the following setting:
+
+        OPENID_PHYSICAL_MULTIFACTOR_REQUIRED = True
+        
+If the user's OpenID provider supports the PAPE extension and provides the Physical Multifactor authentication policy, this will
+cause the OpenID login to fail if the user does not provide valid physical authentication to the provider.
+
