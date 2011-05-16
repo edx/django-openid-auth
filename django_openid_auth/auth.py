@@ -33,7 +33,7 @@ __metaclass__ = type
 from django.conf import settings
 from django.contrib.auth.models import User, Group
 from openid.consumer.consumer import SUCCESS
-from openid.extensions import ax, sreg
+from openid.extensions import ax, sreg, pape
 
 from django_openid_auth import teams
 from django_openid_auth.models import UserOpenID
@@ -87,6 +87,12 @@ class OpenIDBackend:
         if getattr(settings, 'OPENID_UPDATE_DETAILS_FROM_SREG', False):
             details = self._extract_user_details(openid_response)
             self.update_user_details(user, details, openid_response)
+
+        if getattr(settings, 'OPENID_PHYSICAL_MULTIFACTOR_REQUIRED', False):
+            pape_response = pape.Response.fromSuccessResponse(openid_response)
+            if pape_response is None or \
+               pape.AUTH_MULTI_FACTOR_PHYSICAL not in pape_response.auth_policies:
+                return None
 
         teams_response = teams.TeamsResponse.fromSuccessResponse(
             openid_response)
