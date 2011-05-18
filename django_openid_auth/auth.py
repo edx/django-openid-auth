@@ -37,13 +37,13 @@ from openid.extensions import ax, sreg, pape
 
 from django_openid_auth import teams
 from django_openid_auth.models import UserOpenID
-
-
-class IdentityAlreadyClaimed(Exception):
-    pass
-
-class StrictUsernameViolation(Exception):
-    pass
+from django_openid_auth.exceptions import (
+    DjangoOpenIDException,
+    IdentityAlreadyClaimed,
+    DuplicateUsernameViolation,
+    MissingUsernameViolation,
+    MissingPhysicalMultiFactor,
+)
     
 class OpenIDBackend:
     """A django.contrib.auth backend that authenticates the user based on
@@ -74,10 +74,7 @@ class OpenIDBackend:
                 claimed_id__exact=openid_response.identity_url)
         except UserOpenID.DoesNotExist:
             if getattr(settings, 'OPENID_CREATE_USERS', False):
-                try:
-                    user = self.create_user_from_openid(openid_response)
-                except StrictUsernameViolation:
-                    return None
+                user = self.create_user_from_openid(openid_response)
         else:
             user = user_openid.user
 
@@ -92,7 +89,7 @@ class OpenIDBackend:
             pape_response = pape.Response.fromSuccessResponse(openid_response)
             if pape_response is None or \
                pape.AUTH_MULTI_FACTOR_PHYSICAL not in pape_response.auth_policies:
-                return None
+                raise MissingPhysicalMultiFactor()
 
         teams_response = teams.TeamsResponse.fromSuccessResponse(
             openid_response)
@@ -152,7 +149,7 @@ class OpenIDBackend:
         # get one back from the provider
         if getattr(settings, 'OPENID_STRICT_USERNAMES', False):
             if nickname is None or nickname == '':
-                raise StrictUsernameViolation("No username")
+                raise MissingUsernameViolation()
                 
         # If we don't have a nickname, and we're not being strict, use a default
         nickname = nickname or 'openiduser'
@@ -188,7 +185,7 @@ class OpenIDBackend:
 
         if getattr(settings, 'OPENID_STRICT_USERNAMES', False):
             if User.objects.filter(username__exact=nickname).count() > 0:
-                raise StrictUsernameViolation("Duplicate username: %s" % nickname)
+                raise DuplicateUsernameViolation("Duplicate username: %s" % nickname)
 
         # Pick a username for the user based on their nickname,
         # checking for conflicts.

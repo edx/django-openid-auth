@@ -55,6 +55,13 @@ from django_openid_auth.forms import OpenIDLoginForm
 from django_openid_auth.models import UserOpenID
 from django_openid_auth.signals import openid_login_complete
 from django_openid_auth.store import DjangoOpenIDStore
+from django_openid_auth.exceptions import (
+    DjangoOpenIDException,
+    IdentityAlreadyClaimed,
+    DuplicateUsernameViolation,
+    MissingUsernameViolation,
+    MissingPhysicalMultiFactor,
+)
 
 
 next_url_re = re.compile('^/[-\w/]+$')
@@ -118,10 +125,11 @@ def render_openid_request(request, openid_request, return_to, trust_root=None):
 
 
 def default_render_failure(request, message, status=403,
-                           template_name='openid/failure.html'):
+                           template_name='openid/failure.html',
+                           exception=None):
     """Render an error page to the user."""
     data = render_to_string(
-        template_name, dict(message=message),
+        template_name, dict(message=message, exception=exception),
         context_instance=RequestContext(request))
     return HttpResponse(data, status=status)
 
@@ -171,7 +179,8 @@ def login_begin(request, template_name='openid/login.html',
         openid_request = consumer.begin(openid_url)
     except DiscoveryFailure, exc:
         return render_failure(
-            request, "OpenID discovery error: %s" % (str(exc),), status=500)
+            request, "OpenID discovery error: %s" % (str(exc),), status=500,
+            exception=exc)
 
     # Request some user details.  If the provider advertises support
     # for attribute exchange, use that.
@@ -248,7 +257,11 @@ def login_complete(request, redirect_field_name=REDIRECT_FIELD_NAME,
             request, 'This is an OpenID relying party endpoint.')
 
     if openid_response.status == SUCCESS:
-        user = authenticate(openid_response=openid_response)
+        try:
+            user = authenticate(openid_response=openid_response)
+        except DjangoOpenIDException, e:
+            return render_failure(request, "Login Failed", exception=e)
+            
         if user is not None:
             if user.is_active:
                 auth_login(request, user)
