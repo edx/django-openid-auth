@@ -136,6 +136,7 @@ class RelyingPartyTests(TestCase):
         self.old_sso_server_url = getattr(settings, 'OPENID_SSO_SERVER_URL', None)
         self.old_teams_map = getattr(settings, 'OPENID_LAUNCHPAD_TEAMS_MAPPING', {})
         self.old_use_as_admin_login = getattr(settings, 'OPENID_USE_AS_ADMIN_LOGIN', False)
+        self.old_follow_renames = getattr(settings, 'OPENID_FOLLOW_RENAMES', False)
 
         settings.OPENID_CREATE_USERS = False
         settings.OPENID_STRICT_USERNAMES = False
@@ -143,6 +144,7 @@ class RelyingPartyTests(TestCase):
         settings.OPENID_SSO_SERVER_URL = None
         settings.OPENID_LAUNCHPAD_TEAMS_MAPPING = {}
         settings.OPENID_USE_AS_ADMIN_LOGIN = False
+        settings.OPENID_FOLLOW_RENAMES = False
 
     def tearDown(self):
         settings.LOGIN_REDIRECT_URL = self.old_login_redirect_url
@@ -152,6 +154,7 @@ class RelyingPartyTests(TestCase):
         settings.OPENID_SSO_SERVER_URL = self.old_sso_server_url
         settings.OPENID_LAUNCHPAD_TEAMS_MAPPING = self.old_teams_map
         settings.OPENID_USE_AS_ADMIN_LOGIN = self.old_use_as_admin_login
+        settings.OPENID_FOLLOW_RENAMES = self.old_follow_renames
 
         setDefaultFetcher(None)
         super(RelyingPartyTests, self).tearDown()
@@ -289,6 +292,213 @@ class RelyingPartyTests(TestCase):
         self.assertEquals(user.last_name, 'User')
         self.assertEquals(user.email, 'foo@example.com')
 
+    def _do_user_login(self, openid_req, openid_resp):
+        # Posting in an identity URL begins the authentication request:
+        response = self.client.post('/openid/login/', openid_req)
+        self.assertContains(response, 'OpenID transaction in progress')
+
+        # Complete the request, passing back some simple registration
+        # data.  The user is redirected to the next URL.
+        openid_request = self.provider.parseFormPost(response.content)
+        sreg_request = sreg.SRegRequest.fromOpenIDRequest(openid_request)
+        openid_response = openid_request.answer(True)
+        sreg_response = sreg.SRegResponse.extractResponse(
+            sreg_request, openid_resp)
+        openid_response.addExtension(sreg_response)
+        response = self.complete(openid_response)
+        self.assertRedirects(response, 'http://testserver/getuser/')
+
+    def test_login_without_nickname(self):
+        settings.OPENID_CREATE_USERS = True
+
+        openid_req = {'openid_identifier': 'http://example.com/identity',
+               'next': '/getuser/'}
+        openid_resp =  {'nickname': '', 'fullname': 'Openid User',
+                 'email': 'foo@example.com'}
+        self._do_user_login(openid_req, openid_resp)
+        response = self.client.get('/getuser/')
+
+        # username defaults to 'openiduser'
+        self.assertEquals(response.content, 'openiduser')
+
+        # The user's full name and email have been updated.
+        user = User.objects.get(username=response.content)
+        self.assertEquals(user.first_name, 'Openid')
+        self.assertEquals(user.last_name, 'User')
+        self.assertEquals(user.email, 'foo@example.com')
+        
+    def test_login_follow_rename(self):
+        settings.OPENID_FOLLOW_RENAMES = True
+        settings.OPENID_UPDATE_DETAILS_FROM_SREG = True
+        user = User.objects.create_user('testuser', 'someone@example.com')
+        useropenid = UserOpenID(
+            user=user,
+            claimed_id='http://example.com/identity',
+            display_id='http://example.com/identity')
+        useropenid.save()
+
+        openid_req = {'openid_identifier': 'http://example.com/identity',
+               'next': '/getuser/'}
+        openid_resp =  {'nickname': 'someuser', 'fullname': 'Some User',
+                 'email': 'foo@example.com'}
+        self._do_user_login(openid_req, openid_resp)
+        response = self.client.get('/getuser/')
+
+        # If OPENID_FOLLOW_RENAMES, they are logged in as 
+        # someuser (the passed in nickname has changed the username)
+        self.assertEquals(response.content, 'someuser')
+
+        # The user's full name and email have been updated.
+        user = User.objects.get(username=response.content)
+        self.assertEquals(user.first_name, 'Some')
+        self.assertEquals(user.last_name, 'User')
+        self.assertEquals(user.email, 'foo@example.com')
+        
+    def test_login_follow_rename_conflict(self):
+        settings.OPENID_FOLLOW_RENAMES = True
+        settings.OPENID_UPDATE_DETAILS_FROM_SREG = True
+        # Setup existing user who's name we're going to switch to
+        user = User.objects.create_user('testuser', 'someone@example.com')
+        UserOpenID.objects.get_or_create(
+            user=user,
+            claimed_id='http://example.com/existing_identity',
+            display_id='http://example.com/existing_identity')
+
+        # Setup user who is going to try to change username to 'testuser'
+        renamed_user = User.objects.create_user('renameuser', 'someone@example.com')
+        UserOpenID.objects.get_or_create(
+            user=renamed_user,
+            claimed_id='http://example.com/identity',
+            display_id='http://example.com/identity')
+
+        # identity url is for 'renameuser'
+        openid_req = {'openid_identifier': 'http://example.com/identity',
+               'next': '/getuser/'}
+        # but returned username is for 'testuser', which already exists for another identity
+        openid_resp =  {'nickname': 'testuser', 'fullname': 'Rename User',
+                 'email': 'rename@example.com'}
+        self._do_user_login(openid_req, openid_resp)
+        response = self.client.get('/getuser/')
+
+        # If OPENID_FOLLOW_RENAMES, attempt to change username to 'testuser'
+        # but since that username is already taken by someone else, we go through
+        # the process of adding +i to it, and get testuser2.
+        self.assertEquals(response.content, 'testuser2')
+
+        # The user's full name and email have been updated.
+        user = User.objects.get(username=response.content)
+        self.assertEquals(user.first_name, 'Rename')
+        self.assertEquals(user.last_name, 'User')
+        self.assertEquals(user.email, 'rename@example.com')
+        
+    def test_login_follow_rename_false_onlyonce(self):
+        settings.OPENID_FOLLOW_RENAMES = True
+        settings.OPENID_UPDATE_DETAILS_FROM_SREG = True
+        # Setup existing user who's name we're going to switch to
+        user = User.objects.create_user('testuser', 'someone@example.com')
+        UserOpenID.objects.get_or_create(
+            user=user,
+            claimed_id='http://example.com/existing_identity',
+            display_id='http://example.com/existing_identity')
+
+        # Setup user who is going to try to change username to 'testuser'
+        renamed_user = User.objects.create_user('testuser2000eight', 'someone@example.com')
+        UserOpenID.objects.get_or_create(
+            user=renamed_user,
+            claimed_id='http://example.com/identity',
+            display_id='http://example.com/identity')
+
+        # identity url is for 'testuser2000eight'
+        openid_req = {'openid_identifier': 'http://example.com/identity',
+               'next': '/getuser/'}
+        # but returned username is for 'testuser', which already exists for another identity
+        openid_resp =  {'nickname': 'testuser2', 'fullname': 'Rename User',
+                 'email': 'rename@example.com'}
+        self._do_user_login(openid_req, openid_resp)
+        response = self.client.get('/getuser/')
+
+        # If OPENID_FOLLOW_RENAMES, attempt to change username to 'testuser'
+        # but since that username is already taken by someone else, we go through
+        # the process of adding +i to it.  Even though it looks like the username
+        # follows the nickname+i scheme, it has non-numbers in the suffix, so 
+        # it's not an auto-generated one.  The regular process of renaming to 
+        # 'testuser' has a conflict, so we get +2 at the end.
+        self.assertEquals(response.content, 'testuser2')
+
+        # The user's full name and email have been updated.
+        user = User.objects.get(username=response.content)
+        self.assertEquals(user.first_name, 'Rename')
+        self.assertEquals(user.last_name, 'User')
+        self.assertEquals(user.email, 'rename@example.com')
+        
+    def test_login_follow_rename_conflict_onlyonce(self):
+        settings.OPENID_FOLLOW_RENAMES = True
+        settings.OPENID_UPDATE_DETAILS_FROM_SREG = True
+        # Setup existing user who's name we're going to switch to
+        user = User.objects.create_user('testuser', 'someone@example.com')
+        UserOpenID.objects.get_or_create(
+            user=user,
+            claimed_id='http://example.com/existing_identity',
+            display_id='http://example.com/existing_identity')
+
+        # Setup user who is going to try to change username to 'testuser'
+        renamed_user = User.objects.create_user('testuser2000', 'someone@example.com')
+        UserOpenID.objects.get_or_create(
+            user=renamed_user,
+            claimed_id='http://example.com/identity',
+            display_id='http://example.com/identity')
+
+        # identity url is for 'testuser2000'
+        openid_req = {'openid_identifier': 'http://example.com/identity',
+               'next': '/getuser/'}
+        # but returned username is for 'testuser', which already exists for another identity
+        openid_resp =  {'nickname': 'testuser', 'fullname': 'Rename User',
+                 'email': 'rename@example.com'}
+        self._do_user_login(openid_req, openid_resp)
+        response = self.client.get('/getuser/')
+
+        # If OPENID_FOLLOW_RENAMES, attempt to change username to 'testuser'
+        # but since that username is already taken by someone else, we go through
+        # the process of adding +i to it.  Since the user for this identity url
+        # already has a name matching that pattern, check if first.
+        self.assertEquals(response.content, 'testuser2000')
+
+        # The user's full name and email have been updated.
+        user = User.objects.get(username=response.content)
+        self.assertEquals(user.first_name, 'Rename')
+        self.assertEquals(user.last_name, 'User')
+        self.assertEquals(user.email, 'rename@example.com')
+        
+    def test_login_follow_rename_false_conflict(self):
+        settings.OPENID_FOLLOW_RENAMES = True
+        settings.OPENID_UPDATE_DETAILS_FROM_SREG = True
+        # Setup existing user who's username matches the name+i pattern
+        user = User.objects.create_user('testuser2', 'someone@example.com')
+        UserOpenID.objects.get_or_create(
+            user=user,
+            claimed_id='http://example.com/identity',
+            display_id='http://example.com/identity')
+
+        # identity url is for 'testuser2'
+        openid_req = {'openid_identifier': 'http://example.com/identity',
+               'next': '/getuser/'}
+        # but returned username is for 'testuser', which looks like we've done
+        # a username+1 for them already, but 'testuser' isn't actually taken
+        openid_resp =  {'nickname': 'testuser', 'fullname': 'Same User',
+                 'email': 'same@example.com'}
+        self._do_user_login(openid_req, openid_resp)
+        response = self.client.get('/getuser/')
+
+        # If OPENID_FOLLOW_RENAMES, username should be changed to 'testuser'
+        # because it wasn't currently taken
+        self.assertEquals(response.content, 'testuser')
+
+        # The user's full name and email have been updated.
+        user = User.objects.get(username=response.content)
+        self.assertEquals(user.first_name, 'Same')
+        self.assertEquals(user.last_name, 'User')
+        self.assertEquals(user.email, 'same@example.com')
+        
     def test_strict_username_no_nickname(self):
         settings.OPENID_CREATE_USERS = True
         settings.OPENID_STRICT_USERNAMES = True
@@ -354,31 +564,17 @@ class RelyingPartyTests(TestCase):
             display_id='http://example.com/identity')
         useropenid.save()
 
-        # Posting in an identity URL begins the authentication request:
-        response = self.client.post('/openid/login/',
-            {'openid_identifier': 'http://example.com/identity',
-             'next': '/getuser/'})
-        self.assertContains(response, 'OpenID transaction in progress')
-
-        # Complete the request, passing back some simple registration
-        # data.  The user is redirected to the next URL.
-        openid_request = self.provider.parseFormPost(response.content)
-        sreg_request = sreg.SRegRequest.fromOpenIDRequest(openid_request)
-        openid_response = openid_request.answer(True)
-        sreg_response = sreg.SRegResponse.extractResponse(
-            sreg_request, {'nickname': 'someuser', 'fullname': 'Some User',
-                           'email': 'foo@example.com'})
-        openid_response.addExtension(sreg_response)
-        response = self.complete(openid_response)
-        self.assertRedirects(response, 'http://testserver/getuser/')
-
-        # And they are now logged in as testuser (the passed in
-        # nickname has not caused the username to change).
+        openid_req = {'openid_identifier': 'http://example.com/identity',
+               'next': '/getuser/'}
+        openid_resp =  {'nickname': 'testuser', 'fullname': 'Some User',
+                 'email': 'foo@example.com'}
+        self._do_user_login(openid_req, openid_resp)
         response = self.client.get('/getuser/')
+
         self.assertEquals(response.content, 'testuser')
 
         # The user's full name and email have been updated.
-        user = User.objects.get(username='testuser')
+        user = User.objects.get(username=response.content)
         self.assertEquals(user.first_name, 'Some')
         self.assertEquals(user.last_name, 'User')
         self.assertEquals(user.email, 'foo@example.com')
@@ -473,6 +669,7 @@ class RelyingPartyTests(TestCase):
         self.assertEquals(user.email, 'foo@example.com')
 
     def test_login_teams(self):
+        settings.OPENID_LAUNCHPAD_TEAMS_MAPPING_AUTO = False
         settings.OPENID_LAUNCHPAD_TEAMS_MAPPING = {'teamname': 'groupname',
                                                    'otherteam': 'othergroup'}
         user = User.objects.create_user('testuser', 'someone@example.com')

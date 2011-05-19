@@ -86,7 +86,7 @@ class OpenIDBackend:
 
         if getattr(settings, 'OPENID_UPDATE_DETAILS_FROM_SREG', False):
             details = self._extract_user_details(openid_response)
-            self.update_user_details(user, details)
+            self.update_user_details(user, details, openid_response)
 
         teams_response = teams.TeamsResponse.fromSuccessResponse(
             openid_response)
@@ -103,7 +103,6 @@ class OpenIDBackend:
             email = sreg_response.get('email')
             fullname = sreg_response.get('fullname')
             nickname = sreg_response.get('nickname')
-
         # If any attributes are provided via Attribute Exchange, use
         # them in preference.
         fetch_response = ax.FetchResponse.fromSuccessResponse(openid_response)
@@ -142,17 +141,49 @@ class OpenIDBackend:
         return dict(email=email, nickname=nickname,
                     first_name=first_name, last_name=last_name)
 
-    def create_user_from_openid(self, openid_response):
-        details = self._extract_user_details(openid_response)
-        nickname = details['nickname'] or 'openiduser'
-        email = details['email'] or ''
+    def _get_available_username(self, nickname, identity_url):
+        # If we're being strict about usernames, throw an error if we didn't
+        # get one back from the provider
+        if getattr(settings, 'OPENID_STRICT_USERNAMES', False):
+            if nickname is None or nickname == '':
+                raise StrictUsernameViolation("No username")
+                
+        # If we don't have a nickname, and we're not being strict, use a default
+        nickname = nickname or 'openiduser'
+
+        # See if we already have this nickname assigned to a username
+        try:
+            user = User.objects.get(username__exact=nickname)
+        except User.DoesNotExist:
+            # No conflict, we can use this nickname
+            return nickname
+            
+        # Check if we already have nickname+i for this identity_url
+        try:
+            user_openid = UserOpenID.objects.get(
+                claimed_id__exact=identity_url,
+                user__username__startswith=nickname)
+            # No exception means we have an existing user for this identity
+            # that starts with this nickname, so it's possible we've had to
+            # assign them to nickname+i already.
+            oid_username = user_openid.user.username
+            if len(oid_username) > len(nickname):
+                try:
+                    # check that it ends with a number
+                    int(oid_username[len(nickname):])
+                    return oid_username
+                except ValueError:
+                    # username starts with nickname, but isn't nickname+#
+                    pass
+        except UserOpenID.DoesNotExist:
+            # No user associated with this identity_url
+            pass
+            
 
         if getattr(settings, 'OPENID_STRICT_USERNAMES', False):
-            if details['nickname'] is None or details['nickname'] == '':
-                raise StrictUsernameViolation("No username")
             if User.objects.filter(username__exact=nickname).count() > 0:
                 raise StrictUsernameViolation("Duplicate username: %s" % nickname)
-                
+
         # Pick a username for the user based on their nickname,
         # checking for conflicts.
         i = 1
@@ -161,15 +192,23 @@ class OpenIDBackend:
             if i > 1:
                 username += str(i)
             try:
-                User.objects.get(username__exact=username)
+                user = User.objects.get(username__exact=username)
             except User.DoesNotExist:
                 break
             i += 1
+        return username
+    
+    def create_user_from_openid(self, openid_response):
+        details = self._extract_user_details(openid_response)
+        nickname = details['nickname'] or 'openiduser'
+        email = details['email'] or ''
+
+        username = self._get_available_username(details['nickname'], openid_response.identity_url)
 
         user = User.objects.create_user(username, email, password=None)
-        self.update_user_details(user, details)
-
         self.associate_openid(user, openid_response)
+        self.update_user_details(user, details, openid_response)
+
         return user
 
     def associate_openid(self, user, openid_response):
@@ -192,7 +231,7 @@ class OpenIDBackend:
 
         return user_openid
 
-    def update_user_details(self, user, details):
+    def update_user_details(self, user, details, openid_response):
         updated = False
         if details['first_name']:
             user.first_name = details['first_name']
@@ -202,6 +241,9 @@ class OpenIDBackend:
             updated = True
         if details['email']:
             user.email = details['email']
+            updated = True
+        if getattr(settings, 'OPENID_FOLLOW_RENAMES', False):
+            user.username = self._get_available_username(details['nickname'], openid_response.identity_url)
             updated = True
 
         if updated:

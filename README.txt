@@ -126,6 +126,16 @@ It is worth noting that a user needs to be be marked as a "staff user" to be abl
 The easiest way to resolve this is to use traditional authentication (OPENID_USE_AS_ADMIN_LOGIN = False) to sign in as your first user with a password and authorise your 
 openid user to be staff.
 
+== Change Django usernames if the nickname changes on the provider ==
+
+If you want your Django username to change when a user updates the nickname on their provider, add the following setting:
+
+        OPENID_FOLLOW_RENAMES = True
+
+If the new nickname is available as a Django username, the user is renamed.
+Otherwise the user will be renamed to nickname+i for an incrememnting value of i until no conflict occurs.
+If the user has already been renamed to nickname+1 due to a conflict, and the nickname is still not available, the user will keep their existing username.
+
 == Require a valid nickname ==
 
 If you must have a valid, unique nickname in order to create a user accont, add the following setting:
