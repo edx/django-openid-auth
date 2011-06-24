@@ -132,8 +132,10 @@ class OpenIDBackend:
         if fullname and not (first_name or last_name):
             # Django wants to store first and last names separately,
             # so we do our best to split the full name.
-            if ' ' in fullname:
-                first_name, last_name = fullname.rsplit(None, 1)
+            fullname = fullname.strip()
+            split_names = fullname.rsplit(None, 1)
+            if len(split_names) == 2:
+                first_name, last_name = split_names
             else:
                 first_name = u''
                 last_name = fullname
