@@ -125,14 +125,30 @@ class OpenIDBackendTests(TestCase):
         response = self.make_response_ax()
         user = User.objects.create_user('someuser', 'someuser@example.com',
             password=None)
-        data = dict(first_name="Some56789012345678901234567890123",
-            last_name="User56789012345678901234567890123",
-            email="someotheruser@example.com")
+        data = dict(first_name=u"Some56789012345678901234567890123",
+            last_name=u"User56789012345678901234567890123",
+            email=u"someotheruser@example.com")
 
         self.backend.update_user_details(user, data, response)
 
         self.assertEqual("Some56789012345678901234567890",  user.first_name)
         self.assertEqual("User56789012345678901234567890",  user.last_name)
+
+    def test_extract_user_details_name_with_trailing_space(self):
+        response = self.make_response_ax(fullname="SomeUser ")
+
+        data = self.backend._extract_user_details(response)
+
+        self.assertEqual("", data['first_name'])
+        self.assertEqual("SomeUser", data['last_name'])
+
+    def test_extract_user_details_name_with_thin_space(self):
+        response = self.make_response_ax(fullname=u"Some\u2009User")
+
+        data = self.backend._extract_user_details(response)
+
+        self.assertEqual("Some", data['first_name'])
+        self.assertEqual("User", data['last_name'])
 
 
 def suite():
