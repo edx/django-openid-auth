@@ -234,10 +234,10 @@ class OpenIDBackend:
     def update_user_details(self, user, details, openid_response):
         updated = False
         if details['first_name']:
-            user.first_name = details['first_name']
+            user.first_name = details['first_name'][:30]
             updated = True
         if details['last_name']:
-            user.last_name = details['last_name']
+            user.last_name = details['last_name'][:30]
             updated = True
         if details['email']:
             user.email = details['email']

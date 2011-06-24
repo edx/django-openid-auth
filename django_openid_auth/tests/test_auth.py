@@ -132,7 +132,7 @@ class OpenIDBackendTests(TestCase):
         self.backend.update_user_details(user, data, response)
 
         self.assertEqual("Some56789012345678901234567890",  user.first_name)
-        self.assertEqual("User56789012345678901234567890",  user.first_name)
+        self.assertEqual("User56789012345678901234567890",  user.last_name)
 
 
 def suite():
