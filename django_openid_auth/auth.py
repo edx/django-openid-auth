@@ -44,7 +44,7 @@ class IdentityAlreadyClaimed(Exception):
 
 class StrictUsernameViolation(Exception):
     pass
-    
+
 class OpenIDBackend:
     """A django.contrib.auth backend that authenticates the user based on
     an OpenID response."""
@@ -147,7 +147,7 @@ class OpenIDBackend:
         if getattr(settings, 'OPENID_STRICT_USERNAMES', False):
             if nickname is None or nickname == '':
                 raise StrictUsernameViolation("No username")
-                
+
         # If we don't have a nickname, and we're not being strict, use a default
         nickname = nickname or 'openiduser'
 
@@ -157,7 +157,7 @@ class OpenIDBackend:
         except User.DoesNotExist:
             # No conflict, we can use this nickname
             return nickname
-            
+
         # Check if we already have nickname+i for this identity_url
         try:
             user_openid = UserOpenID.objects.get(
@@ -178,7 +178,7 @@ class OpenIDBackend:
         except UserOpenID.DoesNotExist:
             # No user associated with this identity_url
             pass
-            
+
 
         if getattr(settings, 'OPENID_STRICT_USERNAMES', False):
             if User.objects.filter(username__exact=nickname).count() > 0:
@@ -197,7 +197,7 @@ class OpenIDBackend:
                 break
             i += 1
         return username
-    
+
     def create_user_from_openid(self, openid_response):
         details = self._extract_user_details(openid_response)
         nickname = details['nickname'] or 'openiduser'
