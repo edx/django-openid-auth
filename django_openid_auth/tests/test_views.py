@@ -326,7 +326,7 @@ class RelyingPartyTests(TestCase):
         self.assertEquals(user.first_name, 'Openid')
         self.assertEquals(user.last_name, 'User')
         self.assertEquals(user.email, 'foo@example.com')
-        
+
     def test_login_follow_rename(self):
         settings.OPENID_FOLLOW_RENAMES = True
         settings.OPENID_UPDATE_DETAILS_FROM_SREG = True
@@ -344,7 +344,7 @@ class RelyingPartyTests(TestCase):
         self._do_user_login(openid_req, openid_resp)
         response = self.client.get('/getuser/')
 
-        # If OPENID_FOLLOW_RENAMES, they are logged in as 
+        # If OPENID_FOLLOW_RENAMES, they are logged in as
         # someuser (the passed in nickname has changed the username)
         self.assertEquals(response.content, 'someuser')
 
@@ -353,7 +353,7 @@ class RelyingPartyTests(TestCase):
         self.assertEquals(user.first_name, 'Some')
         self.assertEquals(user.last_name, 'User')
         self.assertEquals(user.email, 'foo@example.com')
-        
+
     def test_login_follow_rename_conflict(self):
         settings.OPENID_FOLLOW_RENAMES = True
         settings.OPENID_UPDATE_DETAILS_FROM_SREG = True
@@ -390,7 +390,7 @@ class RelyingPartyTests(TestCase):
         self.assertEquals(user.first_name, 'Rename')
         self.assertEquals(user.last_name, 'User')
         self.assertEquals(user.email, 'rename@example.com')
-        
+
     def test_login_follow_rename_false_onlyonce(self):
         settings.OPENID_FOLLOW_RENAMES = True
         settings.OPENID_UPDATE_DETAILS_FROM_SREG = True
@@ -420,8 +420,8 @@ class RelyingPartyTests(TestCase):
         # If OPENID_FOLLOW_RENAMES, attempt to change username to 'testuser'
         # but since that username is already taken by someone else, we go through
         # the process of adding +i to it.  Even though it looks like the username
-        # follows the nickname+i scheme, it has non-numbers in the suffix, so 
-        # it's not an auto-generated one.  The regular process of renaming to 
+        # follows the nickname+i scheme, it has non-numbers in the suffix, so
+        # it's not an auto-generated one.  The regular process of renaming to
         # 'testuser' has a conflict, so we get +2 at the end.
         self.assertEquals(response.content, 'testuser2')
 
@@ -430,7 +430,7 @@ class RelyingPartyTests(TestCase):
         self.assertEquals(user.first_name, 'Rename')
         self.assertEquals(user.last_name, 'User')
         self.assertEquals(user.email, 'rename@example.com')
-        
+
     def test_login_follow_rename_conflict_onlyonce(self):
         settings.OPENID_FOLLOW_RENAMES = True
         settings.OPENID_UPDATE_DETAILS_FROM_SREG = True
@@ -468,7 +468,7 @@ class RelyingPartyTests(TestCase):
         self.assertEquals(user.first_name, 'Rename')
         self.assertEquals(user.last_name, 'User')
         self.assertEquals(user.email, 'rename@example.com')
-        
+
     def test_login_follow_rename_false_conflict(self):
         settings.OPENID_FOLLOW_RENAMES = True
         settings.OPENID_UPDATE_DETAILS_FROM_SREG = True
@@ -498,7 +498,7 @@ class RelyingPartyTests(TestCase):
         self.assertEquals(user.first_name, 'Same')
         self.assertEquals(user.last_name, 'User')
         self.assertEquals(user.email, 'same@example.com')
-        
+
     def test_strict_username_no_nickname(self):
         settings.OPENID_CREATE_USERS = True
         settings.OPENID_STRICT_USERNAMES = True
@@ -520,7 +520,7 @@ class RelyingPartyTests(TestCase):
                            'email': 'foo@example.com'})
         openid_response.addExtension(sreg_response)
         response = self.complete(openid_response)
-        
+
         # Status code should be 403: Forbidden
         self.assertEquals(403, response.status_code)
 
@@ -551,7 +551,7 @@ class RelyingPartyTests(TestCase):
                            'email': 'foo@example.com'})
         openid_response.addExtension(sreg_response)
         response = self.complete(openid_response)
-        
+
         # Status code should be 403: Forbidden
         self.assertEquals(403, response.status_code)
 
@@ -598,6 +598,27 @@ class RelyingPartyTests(TestCase):
         sreg_request = sreg.SRegRequest.fromOpenIDRequest(openid_request)
         for field in ('email', 'fullname', 'nickname', 'language'):
             self.assertTrue(field in sreg_request)
+
+    def test_login_uses_sreg_required_fields(self):
+        # The configurable sreg attributes are used in the request.
+        settings.OPENID_SREG_REQUIRED_FIELDS = ('email', 'language')
+        user = User.objects.create_user('testuser', 'someone@example.com')
+        useropenid = UserOpenID(
+            user=user,
+            claimed_id='http://example.com/identity',
+            display_id='http://example.com/identity')
+        useropenid.save()
+
+        # Posting in an identity URL begins the authentication request:
+        response = self.client.post('/openid/login/',
+            {'openid_identifier': 'http://example.com/identity',
+             'next': '/getuser/'})
+
+        openid_request = self.provider.parseFormPost(response.content)
+        sreg_request = sreg.SRegRequest.fromOpenIDRequest(openid_request)
+
+        self.assertEqual(['email', 'language'], sreg_request.required)
+        self.assertEqual(['fullname', 'nickname'], sreg_request.optional)
 
     def test_login_attribute_exchange(self):
         settings.OPENID_UPDATE_DETAILS_FROM_SREG = True
