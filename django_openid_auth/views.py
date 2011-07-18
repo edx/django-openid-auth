@@ -200,8 +200,11 @@ def login_begin(request, template_name='openid/login.html',
         sreg_required_fields.extend(
             getattr(settings, 'OPENID_SREG_REQUIRED_FIELDS', []))
         sreg_optional_fields = ['email', 'fullname', 'nickname']
-        extra_fields = getattr(settings, 'OPENID_SREG_EXTRA_FIELDS', [])
-        sreg_optional_fields.extend(extra_fields)
+        sreg_optional_fields.extend(
+            getattr(settings, 'OPENID_SREG_EXTRA_FIELDS', []))
+        sreg_optional_fields = [
+            field for field in sreg_optional_fields if (
+                not field in sreg_required_fields)]
         openid_request.addExtension(
             sreg.SRegRequest(optional=sreg_optional_fields,
                 required=sreg_required_fields))
