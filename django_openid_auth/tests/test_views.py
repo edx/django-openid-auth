@@ -620,6 +620,37 @@ class RelyingPartyTests(TestCase):
         self.assertEqual(['email', 'language'], sreg_request.required)
         self.assertEqual(['fullname', 'nickname'], sreg_request.optional)
 
+    def test_login_requires_sreg_required_fields(self):
+        # If any required attributes are not included in the response,
+        # we fail with a forbidden.
+        settings.OPENID_SREG_REQUIRED_FIELDS = ('email', 'language')
+        user = User.objects.create_user('testuser', 'someone@example.com')
+        useropenid = UserOpenID(
+            user=user,
+            claimed_id='http://example.com/identity',
+            display_id='http://example.com/identity')
+        useropenid.save()
+
+        # Posting in an identity URL begins the authentication request:
+        response = self.client.post('/openid/login/',
+            {'openid_identifier': 'http://example.com/identity',
+             'next': '/getuser/'})
+        # Complete the request, passing back some simple registration
+        # data.  The user is redirected to the next URL.
+        openid_request = self.provider.parseFormPost(response.content)
+        sreg_request = sreg.SRegRequest.fromOpenIDRequest(openid_request)
+        openid_response = openid_request.answer(True)
+        sreg_response = sreg.SRegResponse.extractResponse(
+            sreg_request, {'nickname': 'foo',
+                           'fullname': 'Some User',
+                           'email': 'foo@example.com'})
+        openid_response.addExtension(sreg_response)
+        response = self.complete(openid_response)
+
+        # Status code should be 403: Forbidden, as the required
+        # language was not included.
+        self.assertEquals(403, response.status_code)
+
     def test_login_attribute_exchange(self):
         settings.OPENID_UPDATE_DETAILS_FROM_SREG = True
         user = User.objects.create_user('testuser', 'someone@example.com')
