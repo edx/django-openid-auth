@@ -45,6 +45,9 @@ class IdentityAlreadyClaimed(Exception):
 class StrictUsernameViolation(Exception):
     pass
 
+class RequiredAttributeNotReturned(Exception):
+    pass
+
 class OpenIDBackend:
     """A django.contrib.auth backend that authenticates the user based on
     an OpenID response."""
@@ -76,7 +79,7 @@ class OpenIDBackend:
             if getattr(settings, 'OPENID_CREATE_USERS', False):
                 try:
                     user = self.create_user_from_openid(openid_response)
-                except StrictUsernameViolation:
+                except (StrictUsernameViolation, RequiredAttributeNotReturned):
                     return None
         else:
             user = user_openid.user
@@ -202,6 +205,13 @@ class OpenIDBackend:
 
     def create_user_from_openid(self, openid_response):
         details = self._extract_user_details(openid_response)
+        required_attrs = getattr(settings, 'OPENID_SREG_REQUIRED_FIELDS', [])
+        for required_attr in required_attrs:
+            if required_attr not in details:
+                raise RequiredAttributeNotReturned(
+                    "The required attribute '{0}' was not returned.".format(
+                        required_attr))
+
         nickname = details['nickname'] or 'openiduser'
         email = details['email'] or ''
 
