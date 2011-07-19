@@ -147,12 +147,6 @@ class OpenIDBackend:
                     first_name=first_name, last_name=last_name)
 
     def _get_available_username(self, nickname, identity_url):
-        # If we're being strict about usernames, throw an error if we didn't
-        # get one back from the provider
-        if getattr(settings, 'OPENID_STRICT_USERNAMES', False):
-            if nickname is None or nickname == '':
-                raise StrictUsernameViolation("No username")
-
         # If we don't have a nickname, and we're not being strict, use a default
         nickname = nickname or 'openiduser'
 
@@ -206,8 +200,11 @@ class OpenIDBackend:
     def create_user_from_openid(self, openid_response):
         details = self._extract_user_details(openid_response)
         required_attrs = getattr(settings, 'OPENID_SREG_REQUIRED_FIELDS', [])
+        if getattr(settings, 'OPENID_STRICT_USERNAMES', False):
+            required_attrs.append('nickname')
+
         for required_attr in required_attrs:
-            if required_attr not in details:
+            if required_attr not in details or not details[required_attr]:
                 raise RequiredAttributeNotReturned(
                     "The required attribute '{0}' was not returned.".format(
                         required_attr))

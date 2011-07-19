@@ -137,6 +137,8 @@ class RelyingPartyTests(TestCase):
         self.old_teams_map = getattr(settings, 'OPENID_LAUNCHPAD_TEAMS_MAPPING', {})
         self.old_use_as_admin_login = getattr(settings, 'OPENID_USE_AS_ADMIN_LOGIN', False)
         self.old_follow_renames = getattr(settings, 'OPENID_FOLLOW_RENAMES', False)
+        self.old_required_fields = getattr(
+            settings, 'OPENID_SREG_REQUIRED_FIELDS', [])
 
         settings.OPENID_CREATE_USERS = False
         settings.OPENID_STRICT_USERNAMES = False
@@ -145,6 +147,7 @@ class RelyingPartyTests(TestCase):
         settings.OPENID_LAUNCHPAD_TEAMS_MAPPING = {}
         settings.OPENID_USE_AS_ADMIN_LOGIN = False
         settings.OPENID_FOLLOW_RENAMES = False
+        settings.OPENID_SREG_REQUIRED_FIELDS = []
 
     def tearDown(self):
         settings.LOGIN_REDIRECT_URL = self.old_login_redirect_url
@@ -155,6 +158,7 @@ class RelyingPartyTests(TestCase):
         settings.OPENID_LAUNCHPAD_TEAMS_MAPPING = self.old_teams_map
         settings.OPENID_USE_AS_ADMIN_LOGIN = self.old_use_as_admin_login
         settings.OPENID_FOLLOW_RENAMES = self.old_follow_renames
+        settings.OPENID_SREG_REQUIRED_FIELDS = self.old_required_fields
 
         setDefaultFetcher(None)
         super(RelyingPartyTests, self).tearDown()
