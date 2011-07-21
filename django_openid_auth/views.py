@@ -51,6 +51,10 @@ from openid.consumer.discover import DiscoveryFailure
 from openid.extensions import sreg, ax
 
 from django_openid_auth import teams
+from django_openid_auth.auth import (
+    RequiredAttributeNotReturned,
+    StrictUsernameViolation,
+    )
 from django_openid_auth.forms import OpenIDLoginForm
 from django_openid_auth.models import UserOpenID
 from django_openid_auth.signals import openid_login_complete
@@ -247,7 +251,11 @@ def login_complete(request, redirect_field_name=REDIRECT_FIELD_NAME,
             request, 'This is an OpenID relying party endpoint.')
 
     if openid_response.status == SUCCESS:
-        user = authenticate(openid_response=openid_response)
+        try:
+            user = authenticate(openid_response=openid_response)
+        except (StrictUsernameViolation, RequiredAttributeNotReturned), e:
+            return render_failure(request, e)
+
         if user is not None:
             if user.is_active:
                 auth_login(request, user)

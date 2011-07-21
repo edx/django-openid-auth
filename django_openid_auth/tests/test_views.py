@@ -557,7 +557,10 @@ class RelyingPartyTests(TestCase):
         response = self.complete(openid_response)
 
         # Status code should be 403: Forbidden
-        self.assertEquals(403, response.status_code)
+        self.assertContains(response,
+            "The username (someuser) with which you tried to log in is "
+            "already in use for a different account.",
+            status_code=403)
 
     def test_login_requires_sreg_required_fields(self):
         # If any required attributes are not included in the response,
@@ -584,8 +587,9 @@ class RelyingPartyTests(TestCase):
 
         # Status code should be 403: Forbidden as we didn't include
         # a required field - language.
-        self.assertEquals(403, response.status_code)
-
+        self.assertContains(response,
+            "An attribute required for logging in was not returned "
+            "(language)", status_code=403)
 
     def test_login_update_details(self):
         settings.OPENID_UPDATE_DETAILS_FROM_SREG = True
