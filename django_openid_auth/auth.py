@@ -45,6 +45,9 @@ class IdentityAlreadyClaimed(Exception):
 class StrictUsernameViolation(Exception):
     pass
 
+class RequiredAttributeNotReturned(Exception):
+    pass
+
 class OpenIDBackend:
     """A django.contrib.auth backend that authenticates the user based on
     an OpenID response."""
@@ -74,10 +77,7 @@ class OpenIDBackend:
                 claimed_id__exact=openid_response.identity_url)
         except UserOpenID.DoesNotExist:
             if getattr(settings, 'OPENID_CREATE_USERS', False):
-                try:
-                    user = self.create_user_from_openid(openid_response)
-                except StrictUsernameViolation:
-                    return None
+                user = self.create_user_from_openid(openid_response)
         else:
             user = user_openid.user
 
@@ -144,12 +144,6 @@ class OpenIDBackend:
                     first_name=first_name, last_name=last_name)
 
     def _get_available_username(self, nickname, identity_url):
-        # If we're being strict about usernames, throw an error if we didn't
-        # get one back from the provider
-        if getattr(settings, 'OPENID_STRICT_USERNAMES', False):
-            if nickname is None or nickname == '':
-                raise StrictUsernameViolation("No username")
-
         # If we don't have a nickname, and we're not being strict, use a default
         nickname = nickname or 'openiduser'
 
@@ -184,7 +178,9 @@ class OpenIDBackend:
 
         if getattr(settings, 'OPENID_STRICT_USERNAMES', False):
             if User.objects.filter(username__exact=nickname).count() > 0:
-                raise StrictUsernameViolation("Duplicate username: %s" % nickname)
+                raise StrictUsernameViolation(
+                    "The username (%s) with which you tried to log in is "
+                    "already in use for a different account." % nickname)
 
         # Pick a username for the user based on their nickname,
         # checking for conflicts.
@@ -202,6 +198,16 @@ class OpenIDBackend:
 
     def create_user_from_openid(self, openid_response):
         details = self._extract_user_details(openid_response)
+        required_attrs = getattr(settings, 'OPENID_SREG_REQUIRED_FIELDS', [])
+        if getattr(settings, 'OPENID_STRICT_USERNAMES', False):
+            required_attrs.append('nickname')
+
+        for required_attr in required_attrs:
+            if required_attr not in details or not details[required_attr]:
+                raise RequiredAttributeNotReturned(
+                    "An attribute required for logging in was not "
+                    "returned ({0}).".format(required_attr))
+
         nickname = details['nickname'] or 'openiduser'
         email = details['email'] or ''
 
