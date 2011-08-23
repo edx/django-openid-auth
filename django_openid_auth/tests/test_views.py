@@ -42,16 +42,13 @@ from openid.fetchers import (
 from openid.oidutil import importElementTree
 from openid.server.server import BROWSER_REQUEST_MODES, ENCODE_URL, Server
 from openid.store.memstore import MemoryStore
-from openid.message import (OPENID1_URL_LIMIT, IDENTIFIER_SELECT)
+from openid.message import OPENID1_URL_LIMIT, IDENTIFIER_SELECT
 
 from django_openid_auth import teams
 from django_openid_auth.models import UserOpenID
 from django_openid_auth.views import (
     sanitise_redirect_url, 
     make_consumer,
-    login_begin,
-    login_complete,
-    parse_openid_response,
 )
 from django_openid_auth.auth import OpenIDBackend
 from django_openid_auth.signals import openid_login_complete
