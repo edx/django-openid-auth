@@ -42,8 +42,9 @@ from django_openid_auth.exceptions import (
     DuplicateUsernameViolation,
     MissingUsernameViolation,
     MissingPhysicalMultiFactor,
+    RequiredAttributeNotReturned,
 )
-    
+
 class OpenIDBackend:
     """A django.contrib.auth backend that authenticates the user based on
     an OpenID response."""
@@ -134,8 +135,10 @@ class OpenIDBackend:
         if fullname and not (first_name or last_name):
             # Django wants to store first and last names separately,
             # so we do our best to split the full name.
-            if ' ' in fullname:
-                first_name, last_name = fullname.rsplit(None, 1)
+            fullname = fullname.strip()
+            split_names = fullname.rsplit(None, 1)
+            if len(split_names) == 2:
+                first_name, last_name = split_names
             else:
                 first_name = u''
                 last_name = fullname
@@ -159,7 +162,7 @@ class OpenIDBackend:
         except User.DoesNotExist:
             # No conflict, we can use this nickname
             return nickname
-            
+
         # Check if we already have nickname+i for this identity_url
         try:
             user_openid = UserOpenID.objects.get(
@@ -180,7 +183,7 @@ class OpenIDBackend:
         except UserOpenID.DoesNotExist:
             # No user associated with this identity_url
             pass
-            
+
 
         if getattr(settings, 'OPENID_STRICT_USERNAMES', False):
             if User.objects.filter(username__exact=nickname).count() > 0:
@@ -199,9 +202,19 @@ class OpenIDBackend:
                 break
             i += 1
         return username
-    
+
     def create_user_from_openid(self, openid_response):
         details = self._extract_user_details(openid_response)
+        required_attrs = getattr(settings, 'OPENID_SREG_REQUIRED_FIELDS', [])
+        if getattr(settings, 'OPENID_STRICT_USERNAMES', False):
+            required_attrs.append('nickname')
+
+        for required_attr in required_attrs:
+            if required_attr not in details or not details[required_attr]:
+                raise RequiredAttributeNotReturned(
+                    "An attribute required for logging in was not "
+                    "returned ({0}).".format(required_attr))
+
         nickname = details['nickname'] or 'openiduser'
         email = details['email'] or ''
 
@@ -236,10 +249,10 @@ class OpenIDBackend:
     def update_user_details(self, user, details, openid_response):
         updated = False
         if details['first_name']:
-            user.first_name = details['first_name']
+            user.first_name = details['first_name'][:30]
             updated = True
         if details['last_name']:
-            user.last_name = details['last_name']
+            user.last_name = details['last_name'][:30]
             updated = True
         if details['email']:
             user.email = details['email']

@@ -55,7 +55,10 @@ from django_openid_auth.forms import OpenIDLoginForm
 from django_openid_auth.models import UserOpenID
 from django_openid_auth.signals import openid_login_complete
 from django_openid_auth.store import DjangoOpenIDStore
-from django_openid_auth.exceptions import DjangoOpenIDException
+from django_openid_auth.exceptions import (
+    RequiredAttributeNotReturned,
+    DjangoOpenIDException,
+)
 
 
 next_url_re = re.compile('^/[-\w/]+$')
@@ -199,11 +202,18 @@ def login_begin(request, template_name='openid/login.html',
             fetch_request.add(ax.AttrInfo(attr, alias=alias, required=True))
         openid_request.addExtension(fetch_request)
     else:
+        sreg_required_fields = []
+        sreg_required_fields.extend(
+            getattr(settings, 'OPENID_SREG_REQUIRED_FIELDS', []))
         sreg_optional_fields = ['email', 'fullname', 'nickname']
-        extra_fields = getattr(settings, 'OPENID_SREG_EXTRA_FIELDS', [])
-        sreg_optional_fields.extend(extra_fields)
+        sreg_optional_fields.extend(
+            getattr(settings, 'OPENID_SREG_EXTRA_FIELDS', []))
+        sreg_optional_fields = [
+            field for field in sreg_optional_fields if (
+                not field in sreg_required_fields)]
         openid_request.addExtension(
-            sreg.SRegRequest(optional=sreg_optional_fields))
+            sreg.SRegRequest(optional=sreg_optional_fields,
+                required=sreg_required_fields))
             
     if getattr(settings, 'OPENID_PHYSICAL_MULTIFACTOR_REQUIRED', False):
         preferred_auth = [
@@ -211,7 +221,6 @@ def login_begin(request, template_name='openid/login.html',
         ]
         pape_request = pape.Request(preferred_auth_policies=preferred_auth)
         openid_request.addExtension(pape_request)
-
 
     # Request team info
     teams_mapping_auto = getattr(settings, 'OPENID_LAUNCHPAD_TEAMS_MAPPING_AUTO', False)
@@ -257,7 +266,7 @@ def login_complete(request, redirect_field_name=REDIRECT_FIELD_NAME,
         try:
             user = authenticate(openid_response=openid_response)
         except DjangoOpenIDException, e:
-            return render_failure(request, "Login Failed", exception=e)
+            return render_failure(request, e.message, exception=e)
             
         if user is not None:
             if user.is_active:

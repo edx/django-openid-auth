@@ -31,6 +31,9 @@
 class DjangoOpenIDException(Exception):
     pass
 
+class RequiredAttributeNotReturned(DjangoOpenIDException):
+    pass
+
 class IdentityAlreadyClaimed(DjangoOpenIDException):
 
     def __init__(self, message=None):
