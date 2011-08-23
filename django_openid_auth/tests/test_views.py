@@ -839,7 +839,7 @@ class RelyingPartyTests(TestCase):
         self.assertContains(response,
             "The username (someuser) with which you tried to log in is "
             "already in use for a different account.",
-            status_code=403) status_code=403)
+            status_code=403)
 
     def test_strict_username_duplicate_user_override(self):
         settings.OPENID_CREATE_USERS = True
