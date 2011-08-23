@@ -836,7 +836,10 @@ class RelyingPartyTests(TestCase):
         # Status code should be 403: Forbidden
         self.assertEquals(403, response.status_code)
         self.assertContains(response, '<h1>OpenID failed</h1>', status_code=403)
-        self.assertContains(response, '<p>Duplicate username: someuser</p>', status_code=403)
+        self.assertContains(response,
+            "The username (someuser) with which you tried to log in is "
+            "already in use for a different account.",
+            status_code=403) status_code=403)
 
     def test_strict_username_duplicate_user_override(self):
         settings.OPENID_CREATE_USERS = True

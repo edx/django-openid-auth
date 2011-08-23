@@ -187,7 +187,9 @@ class OpenIDBackend:
 
         if getattr(settings, 'OPENID_STRICT_USERNAMES', False):
             if User.objects.filter(username__exact=nickname).count() > 0:
-                raise DuplicateUsernameViolation("Duplicate username: %s" % nickname)
+                raise DuplicateUsernameViolation(
+                    "The username (%s) with which you tried to log in is "
+                    "already in use for a different account." % nickname)
 
         # Pick a username for the user based on their nickname,
         # checking for conflicts.
