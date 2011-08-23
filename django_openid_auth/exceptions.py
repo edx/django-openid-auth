@@ -39,10 +39,7 @@ class IdentityAlreadyClaimed(DjangoOpenIDException):
         else:
             self.message = message
 
-class StrictUsernameViolation(DjangoOpenIDException):
-    pass
-    
-class DuplicateUsernameViolation(StrictUsernameViolation):
+class DuplicateUsernameViolation(DjangoOpenIDException):
 
     def __init__(self, message=None):
         if message is None:
@@ -50,7 +47,7 @@ class DuplicateUsernameViolation(StrictUsernameViolation):
         else:
             self.message = message
 
-class MissingUsernameViolation(StrictUsernameViolation):
+class MissingUsernameViolation(DjangoOpenIDException):
 
     def __init__(self, message=None):
         if message is None:

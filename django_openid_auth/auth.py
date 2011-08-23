@@ -38,7 +38,6 @@ from openid.extensions import ax, sreg, pape
 from django_openid_auth import teams
 from django_openid_auth.models import UserOpenID
 from django_openid_auth.exceptions import (
-    DjangoOpenIDException,
     IdentityAlreadyClaimed,
     DuplicateUsernameViolation,
     MissingUsernameViolation,

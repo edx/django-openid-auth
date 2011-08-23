@@ -55,13 +55,7 @@ from django_openid_auth.forms import OpenIDLoginForm
 from django_openid_auth.models import UserOpenID
 from django_openid_auth.signals import openid_login_complete
 from django_openid_auth.store import DjangoOpenIDStore
-from django_openid_auth.exceptions import (
-    DjangoOpenIDException,
-    IdentityAlreadyClaimed,
-    DuplicateUsernameViolation,
-    MissingUsernameViolation,
-    MissingPhysicalMultiFactor,
-)
+from django_openid_auth.exceptions import DjangoOpenIDException
 
 
 next_url_re = re.compile('^/[-\w/]+$')
@@ -248,8 +242,11 @@ def login_begin(request, template_name='openid/login.html',
 
 @csrf_exempt
 def login_complete(request, redirect_field_name=REDIRECT_FIELD_NAME,
-                   render_failure=default_render_failure):
+                   render_failure=None):
     redirect_to = request.REQUEST.get(redirect_field_name, '')
+    render_failure = render_failure or \
+                     getattr(settings, 'OPENID_RENDER_FAILURE', None) or \
+                     default_render_failure
 
     openid_response = parse_openid_response(request)
     if not openid_response:
