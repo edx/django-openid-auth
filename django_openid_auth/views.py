@@ -48,7 +48,7 @@ except ImportError:
 from openid.consumer.consumer import (
     Consumer, SUCCESS, CANCEL, FAILURE)
 from openid.consumer.discover import DiscoveryFailure
-from openid.extensions import sreg, ax
+from openid.extensions import sreg, ax, pape
 
 from django_openid_auth import teams
 from django_openid_auth.auth import (
@@ -212,6 +212,14 @@ def login_begin(request, template_name='openid/login.html',
         openid_request.addExtension(
             sreg.SRegRequest(optional=sreg_optional_fields,
                 required=sreg_required_fields))
+            
+    if getattr(settings, 'OPENID_PHYSICAL_MULTIFACTOR_REQUIRED', False):
+        preferred_auth = [
+            pape.AUTH_MULTI_FACTOR_PHYSICAL,
+        ]
+        pape_request = pape.Request(preferred_auth_policies=preferred_auth)
+        openid_request.addExtension(pape_request)
+
 
     # Request team info
     teams_mapping_auto = getattr(settings, 'OPENID_LAUNCHPAD_TEAMS_MAPPING_AUTO', False)

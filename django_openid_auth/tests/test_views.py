@@ -28,23 +28,31 @@
 
 import cgi
 import unittest
+from urllib import quote_plus
 
 from django.conf import settings
 from django.contrib.auth.models import User, Group
 from django.http import HttpRequest
 from django.test import TestCase
-from openid.consumer.consumer import SuccessResponse
-from openid.extensions import ax, sreg
+from openid.consumer.consumer import Consumer, SuccessResponse
+from openid.consumer.discover import OpenIDServiceEndpoint
+from openid.extensions import ax, sreg, pape
 from openid.fetchers import (
     HTTPFetcher, HTTPFetchingError, HTTPResponse, setDefaultFetcher)
 from openid.oidutil import importElementTree
 from openid.server.server import BROWSER_REQUEST_MODES, ENCODE_URL, Server
 from openid.store.memstore import MemoryStore
+from openid.message import OPENID1_URL_LIMIT, IDENTIFIER_SELECT
 
 from django_openid_auth import teams
 from django_openid_auth.models import UserOpenID
-from django_openid_auth.views import sanitise_redirect_url
+from django_openid_auth.views import (
+    sanitise_redirect_url, 
+    make_consumer,
+)
+from django_openid_auth.auth import OpenIDBackend
 from django_openid_auth.signals import openid_login_complete
+from django_openid_auth.store import DjangoOpenIDStore
 
 
 ET = importElementTree()
@@ -121,12 +129,45 @@ class StubOpenIDProvider(HTTPFetcher):
         return self.last_request
 
 
+class DummyDjangoRequest(object):
+    def __init__(self, request_path):
+        self.request_path = request_path
+        self.META = {
+            'HTTP_HOST': "localhost",
+            'SCRIPT_NAME': "http://localhost",
+            'SERVER_PROTOCOL': "http",
+        }
+        self.POST = {
+            'openid_identifier': "http://example.com/identity",
+        }
+        self.GET = {}
+        self.session = {}
+
+    def get_full_path(self):
+        return self.META['SCRIPT_NAME'] + self.request_path
+
+    def build_absolute_uri(self):
+        return self.META['SCRIPT_NAME'] + self.request_path
+        
+    def _combined_request(self):
+        request = {}
+        request.update(self.POST)
+        request.update(self.GET)
+        return request
+    REQUEST = property(_combined_request)
+
 class RelyingPartyTests(TestCase):
     urls = 'django_openid_auth.tests.urls'
 
     def setUp(self):
         super(RelyingPartyTests, self).setUp()
         self.provider = StubOpenIDProvider('http://example.com/')
+        self.req = DummyDjangoRequest('http://localhost/')
+        self.endpoint = OpenIDServiceEndpoint()
+        self.endpoint.claimed_id = 'http://example.com/identity'
+        self.endpoint.server_url = 'http://example.com/'
+        self.consumer = make_consumer(self.req)
+        self.server = Server(DjangoOpenIDStore())
         setDefaultFetcher(self.provider, wrap_exceptions=False)
 
         self.old_login_redirect_url = getattr(settings, 'LOGIN_REDIRECT_URL', '/accounts/profile/')
@@ -137,6 +178,8 @@ class RelyingPartyTests(TestCase):
         self.old_teams_map = getattr(settings, 'OPENID_LAUNCHPAD_TEAMS_MAPPING', {})
         self.old_use_as_admin_login = getattr(settings, 'OPENID_USE_AS_ADMIN_LOGIN', False)
         self.old_follow_renames = getattr(settings, 'OPENID_FOLLOW_RENAMES', False)
+        self.old_physical_multifactor = getattr(settings, 'OPENID_PHYSICAL_MULTIFACTOR_REQUIRED', False)
+        self.old_consumer_complete = Consumer.complete
         self.old_required_fields = getattr(
             settings, 'OPENID_SREG_REQUIRED_FIELDS', [])
 
@@ -147,6 +190,7 @@ class RelyingPartyTests(TestCase):
         settings.OPENID_LAUNCHPAD_TEAMS_MAPPING = {}
         settings.OPENID_USE_AS_ADMIN_LOGIN = False
         settings.OPENID_FOLLOW_RENAMES = False
+        settings.OPENID_PHYSICAL_MULTIFACTOR_REQUIRED = False
         settings.OPENID_SREG_REQUIRED_FIELDS = []
 
     def tearDown(self):
@@ -158,6 +202,8 @@ class RelyingPartyTests(TestCase):
         settings.OPENID_LAUNCHPAD_TEAMS_MAPPING = self.old_teams_map
         settings.OPENID_USE_AS_ADMIN_LOGIN = self.old_use_as_admin_login
         settings.OPENID_FOLLOW_RENAMES = self.old_follow_renames
+        settings.OPENID_PHYSICAL_MULTIFACTOR_REQUIRED = self.old_physical_multifactor
+        Consumer.complete = self.old_consumer_complete
         settings.OPENID_SREG_REQUIRED_FIELDS = self.old_required_fields
 
         setDefaultFetcher(None)
@@ -296,21 +342,149 @@ class RelyingPartyTests(TestCase):
         self.assertEquals(user.last_name, 'User')
         self.assertEquals(user.email, 'foo@example.com')
 
-    def _do_user_login(self, openid_req, openid_resp):
+    def _do_user_login(self, req_data, resp_data, use_sreg=True, use_pape=None):
+        openid_request = self._get_login_request(req_data)
+        openid_response = self._get_login_response(openid_request, resp_data, use_sreg, use_pape)
+        response = self.complete(openid_response)
+        self.assertRedirects(response, 'http://testserver/getuser/')
+        return response
+
+    def _get_login_request(self, req_data):
         # Posting in an identity URL begins the authentication request:
-        response = self.client.post('/openid/login/', openid_req)
+        response = self.client.post('/openid/login/', req_data)
         self.assertContains(response, 'OpenID transaction in progress')
 
         # Complete the request, passing back some simple registration
         # data.  The user is redirected to the next URL.
         openid_request = self.provider.parseFormPost(response.content)
-        sreg_request = sreg.SRegRequest.fromOpenIDRequest(openid_request)
+        return openid_request
+
+    def _get_login_response(self, openid_request, resp_data, use_sreg, use_pape):
         openid_response = openid_request.answer(True)
-        sreg_response = sreg.SRegResponse.extractResponse(
-            sreg_request, openid_resp)
-        openid_response.addExtension(sreg_response)
+
+        if use_sreg:
+            sreg_request = sreg.SRegRequest.fromOpenIDRequest(openid_request)
+            sreg_response = sreg.SRegResponse.extractResponse(
+                sreg_request, resp_data)
+            openid_response.addExtension(sreg_response)
+        if use_pape is not None:
+            policies = [
+                use_pape
+            ]
+            pape_response = pape.Response(auth_policies=policies)
+            openid_response.addExtension(pape_response)
+        return openid_response
+
+    def parse_query_string(self, query_str):
+        query_items = map(tuple,
+            [item.split('=') for item in query_str.split('&')])
+        query = dict(query_items)
+        return query
+
+    def test_login_physical_multifactor_request(self):
+        settings.OPENID_PHYSICAL_MULTIFACTOR_REQUIRED = True
+        preferred_auth = pape.AUTH_MULTI_FACTOR_PHYSICAL
+        self.provider.type_uris.append(pape.ns_uri)
+        
+        openid_req = {'openid_identifier': 'http://example.com/identity',
+               'next': '/getuser/'}
+        response = self.client.post('/openid/login/', openid_req)
+        openid_request = self.provider.parseFormPost(response.content)
+
+        request_auth = openid_request.message.getArg(
+            'http://specs.openid.net/extensions/pape/1.0',
+            'preferred_auth_policies',
+        )
+        self.assertEqual(request_auth, preferred_auth)
+
+    def test_login_physical_multifactor_response(self):
+        settings.OPENID_PHYSICAL_MULTIFACTOR_REQUIRED = True
+        preferred_auth = pape.AUTH_MULTI_FACTOR_PHYSICAL
+        self.provider.type_uris.append(pape.ns_uri)
+
+        def mock_complete(this, request_args, return_to):
+            request = {'openid.mode': 'checkid_setup',
+                       'openid.trust_root': 'http://localhost/',
+                       'openid.return_to': 'http://localhost/',
+                       'openid.identity': IDENTIFIER_SELECT,
+                       'openid.ns.pape' : pape.ns_uri,
+                       'openid.pape.auth_policies': request_args.get('openid.pape.auth_policies', pape.AUTH_NONE),
+            }
+            openid_server = self.provider.server
+            orequest = openid_server.decodeRequest(request)
+            response = SuccessResponse(
+                self.endpoint, orequest.message,
+                signed_fields=['openid.pape.auth_policies',])
+            return response
+        Consumer.complete = mock_complete
+
+        user = User.objects.create_user('testuser', 'test@example.com')
+        useropenid = UserOpenID(
+            user=user,
+            claimed_id='http://example.com/identity',
+            display_id='http://example.com/identity')
+        useropenid.save()
+
+        openid_req = {'openid_identifier': 'http://example.com/identity',
+               'next': '/getuser/'}
+        openid_resp =  {'nickname': 'testuser', 'fullname': 'Openid User',
+                 'email': 'test@example.com'}
+
+        response = self._do_user_login(openid_req, openid_resp, use_pape=pape.AUTH_MULTI_FACTOR_PHYSICAL)
+
+        query = self.parse_query_string(response.request['QUERY_STRING'])
+        self.assertTrue('openid.pape.auth_policies' in query)
+        self.assertEqual(query['openid.pape.auth_policies'], 
+                quote_plus(preferred_auth))
+
+        response = self.client.get('/getuser/')
+        self.assertEqual(response.content, 'testuser')
+
+
+    def test_login_physical_multifactor_not_provided(self):
+        settings.OPENID_PHYSICAL_MULTIFACTOR_REQUIRED = True
+        preferred_auth = pape.AUTH_MULTI_FACTOR_PHYSICAL
+        self.provider.type_uris.append(pape.ns_uri)
+
+        def mock_complete(this, request_args, return_to):
+            request = {'openid.mode': 'checkid_setup',
+                       'openid.trust_root': 'http://localhost/',
+                       'openid.return_to': 'http://localhost/',
+                       'openid.identity': IDENTIFIER_SELECT,
+                       'openid.ns.pape' : pape.ns_uri,
+                       'openid.pape.auth_policies': request_args.get('openid.pape.auth_policies', pape.AUTH_NONE),
+            }
+            openid_server = self.provider.server
+            orequest = openid_server.decodeRequest(request)
+            response = SuccessResponse(
+                self.endpoint, orequest.message,
+                signed_fields=['openid.pape.auth_policies',])
+            return response
+        Consumer.complete = mock_complete
+
+        user = User.objects.create_user('testuser', 'test@example.com')
+        useropenid = UserOpenID(    
+            user=user,
+            claimed_id='http://example.com/identity',
+            display_id='http://example.com/identity')
+        useropenid.save()
+
+        openid_req = {'openid_identifier': 'http://example.com/identity',
+               'next': '/getuser/'}
+        openid_resp =  {'nickname': 'testuser', 'fullname': 'Openid User',
+                 'email': 'test@example.com'}
+
+        openid_request = self._get_login_request(openid_req)
+        openid_response = self._get_login_response(openid_request, openid_req, openid_resp, use_pape=pape.AUTH_NONE)
+
+        response_auth = openid_request.message.getArg(
+            'http://specs.openid.net/extensions/pape/1.0',
+            'auth_policies',
+        )
+        self.assertNotEqual(response_auth, preferred_auth)
+
         response = self.complete(openid_response)
-        self.assertRedirects(response, 'http://testserver/getuser/')
+        self.assertEquals(403, response.status_code)
 
     def test_login_without_nickname(self):
         settings.OPENID_CREATE_USERS = True
