@@ -154,3 +154,15 @@ If your users should use a physical multi-factor authentication method, such as 
 If the user's OpenID provider supports the PAPE extension and provides the Physical Multifactor authentication policy, this will
 cause the OpenID login to fail if the user does not provide valid physical authentication to the provider.
 
+== Override Login Failure Handling ==
+
+You can optionally provide your own handler for login failures by adding the following setting:
+
+        OPENID_RENDER_FAILURE = failure_handler_function
+
+Where failure_handler_function is a function reference that will take the following parameters:
+
+        def failure_handler_function(request, message, status=None, template_name=None, exception=None)
+
+This function must return a Django.http.HttpResponse instance.
+

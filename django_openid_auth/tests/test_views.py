@@ -32,7 +32,7 @@ from urllib import quote_plus
 
 from django.conf import settings
 from django.contrib.auth.models import User, Group
-from django.http import HttpRequest
+from django.http import HttpRequest, HttpResponse
 from django.test import TestCase
 from openid.consumer.consumer import Consumer, SuccessResponse
 from openid.consumer.discover import OpenIDServiceEndpoint
@@ -53,10 +53,14 @@ from django_openid_auth.views import (
 from django_openid_auth.auth import OpenIDBackend
 from django_openid_auth.signals import openid_login_complete
 from django_openid_auth.store import DjangoOpenIDStore
-
+from django_openid_auth.exceptions import (
+    MissingUsernameViolation,
+    DuplicateUsernameViolation,
+    MissingPhysicalMultiFactor,
+    RequiredAttributeNotReturned,
+)
 
 ET = importElementTree()
-
 
 class StubOpenIDProvider(HTTPFetcher):
 
@@ -179,7 +183,9 @@ class RelyingPartyTests(TestCase):
         self.old_use_as_admin_login = getattr(settings, 'OPENID_USE_AS_ADMIN_LOGIN', False)
         self.old_follow_renames = getattr(settings, 'OPENID_FOLLOW_RENAMES', False)
         self.old_physical_multifactor = getattr(settings, 'OPENID_PHYSICAL_MULTIFACTOR_REQUIRED', False)
+        self.old_login_render_failure = getattr(settings, 'OPENID_RENDER_FAILURE', None)
         self.old_consumer_complete = Consumer.complete
+
         self.old_required_fields = getattr(
             settings, 'OPENID_SREG_REQUIRED_FIELDS', [])
 
@@ -203,6 +209,7 @@ class RelyingPartyTests(TestCase):
         settings.OPENID_USE_AS_ADMIN_LOGIN = self.old_use_as_admin_login
         settings.OPENID_FOLLOW_RENAMES = self.old_follow_renames
         settings.OPENID_PHYSICAL_MULTIFACTOR_REQUIRED = self.old_physical_multifactor
+        settings.OPENID_RENDER_FAILURE = self.old_login_render_failure
         Consumer.complete = self.old_consumer_complete
         settings.OPENID_SREG_REQUIRED_FIELDS = self.old_required_fields
 
@@ -485,6 +492,63 @@ class RelyingPartyTests(TestCase):
 
         response = self.complete(openid_response)
         self.assertEquals(403, response.status_code)
+        self.assertContains(response, '<h1>OpenID failed</h1>', status_code=403)
+        self.assertContains(response, '<p>Login requires physical multi-factor authentication.</p>', status_code=403)
+
+    def test_login_physical_multifactor_not_provided_override(self):
+        settings.OPENID_PHYSICAL_MULTIFACTOR_REQUIRED = True
+        preferred_auth = pape.AUTH_MULTI_FACTOR_PHYSICAL
+        self.provider.type_uris.append(pape.ns_uri)
+
+        # Override the login_failure handler
+        def mock_login_failure_handler(request, message, status=403,
+                                       template_name=None,
+                                       exception=None):
+           self.assertTrue(isinstance(exception, MissingPhysicalMultiFactor))
+           return HttpResponse('Test Failure Override', status=200)
+        settings.OPENID_RENDER_FAILURE = mock_login_failure_handler
+
+        def mock_complete(this, request_args, return_to):
+            request = {'openid.mode': 'checkid_setup',
+                       'openid.trust_root': 'http://localhost/',
+                       'openid.return_to': 'http://localhost/',
+                       'openid.identity': IDENTIFIER_SELECT,
+                       'openid.ns.pape' : pape.ns_uri,
+                       'openid.pape.auth_policies': request_args.get('openid.pape.auth_policies', pape.AUTH_NONE),
+            }
+            openid_server = self.provider.server
+            orequest = openid_server.decodeRequest(request)
+            response = SuccessResponse(
+                self.endpoint, orequest.message,
+                signed_fields=['openid.pape.auth_policies',])
+            return response
+        Consumer.complete = mock_complete
+
+        user = User.objects.create_user('testuser', 'test@example.com')
+        useropenid = UserOpenID(    
+            user=user,
+            claimed_id='http://example.com/identity',
+            display_id='http://example.com/identity')
+        useropenid.save()
+
+        openid_req = {'openid_identifier': 'http://example.com/identity',
+               'next': '/getuser/'}
+        openid_resp =  {'nickname': 'testuser', 'fullname': 'Openid User',
+                 'email': 'test@example.com'}
+
+        openid_request = self._get_login_request(openid_req)
+        openid_response = self._get_login_response(openid_request, openid_req, openid_resp, use_pape=pape.AUTH_NONE)
+
+        response_auth = openid_request.message.getArg(
+            'http://specs.openid.net/extensions/pape/1.0',
+            'auth_policies',
+        )
+        self.assertNotEqual(response_auth, preferred_auth)
+
+        # Status code should be 200, since we over-rode the login_failure handler
+        response = self.complete(openid_response)
+        self.assertEquals(200, response.status_code)
+        self.assertContains(response, 'Test Failure Override')
 
     def test_login_without_nickname(self):
         settings.OPENID_CREATE_USERS = True
@@ -680,6 +744,7 @@ class RelyingPartyTests(TestCase):
     def test_strict_username_no_nickname(self):
         settings.OPENID_CREATE_USERS = True
         settings.OPENID_STRICT_USERNAMES = True
+        settings.OPENID_SREG_REQUIRED_FIELDS = []
 
         # Posting in an identity URL begins the authentication request:
         response = self.client.post('/openid/login/',
@@ -701,6 +766,44 @@ class RelyingPartyTests(TestCase):
 
         # Status code should be 403: Forbidden
         self.assertEquals(403, response.status_code)
+        self.assertContains(response, '<h1>OpenID failed</h1>', status_code=403)
+        self.assertContains(response, "An attribute required for logging in was not returned "
+            "(nickname)", status_code=403)
+
+    def test_strict_username_no_nickname_override(self):
+        settings.OPENID_CREATE_USERS = True
+        settings.OPENID_STRICT_USERNAMES = True
+        settings.OPENID_SREG_REQUIRED_FIELDS = []
+
+        # Override the login_failure handler
+        def mock_login_failure_handler(request, message, status=403,
+                                       template_name=None,
+                                       exception=None):
+           self.assertTrue(isinstance(exception, (RequiredAttributeNotReturned, MissingUsernameViolation)))
+           return HttpResponse('Test Failure Override', status=200)
+        settings.OPENID_RENDER_FAILURE = mock_login_failure_handler
+        
+        # Posting in an identity URL begins the authentication request:
+        response = self.client.post('/openid/login/',
+            {'openid_identifier': 'http://example.com/identity',
+             'next': '/getuser/'})
+        self.assertContains(response, 'OpenID transaction in progress')
+
+        # Complete the request, passing back some simple registration
+        # data.  The user is redirected to the next URL.
+        openid_request = self.provider.parseFormPost(response.content)
+        sreg_request = sreg.SRegRequest.fromOpenIDRequest(openid_request)
+        openid_response = openid_request.answer(True)
+        sreg_response = sreg.SRegResponse.extractResponse(
+            sreg_request, {'nickname': '', # No nickname
+                           'fullname': 'Some User',
+                           'email': 'foo@example.com'})
+        openid_response.addExtension(sreg_response)
+        response = self.complete(openid_response)
+            
+        # Status code should be 200, since we over-rode the login_failure handler
+        self.assertEquals(200, response.status_code)
+        self.assertContains(response, 'Test Failure Override')
 
     def test_strict_username_duplicate_user(self):
         settings.OPENID_CREATE_USERS = True
@@ -731,10 +834,53 @@ class RelyingPartyTests(TestCase):
         response = self.complete(openid_response)
 
         # Status code should be 403: Forbidden
+        self.assertEquals(403, response.status_code)
+        self.assertContains(response, '<h1>OpenID failed</h1>', status_code=403)
         self.assertContains(response,
             "The username (someuser) with which you tried to log in is "
             "already in use for a different account.",
             status_code=403)
+
+    def test_strict_username_duplicate_user_override(self):
+        settings.OPENID_CREATE_USERS = True
+        settings.OPENID_STRICT_USERNAMES = True
+
+        # Override the login_failure handler
+        def mock_login_failure_handler(request, message, status=403,
+                                       template_name=None,
+                                       exception=None):
+           self.assertTrue(isinstance(exception, DuplicateUsernameViolation))
+           return HttpResponse('Test Failure Override', status=200)
+        settings.OPENID_RENDER_FAILURE = mock_login_failure_handler
+
+        # Create a user with the same name as we'll pass back via sreg.
+        user = User.objects.create_user('someuser', 'someone@example.com')
+        useropenid = UserOpenID(
+            user=user,
+            claimed_id='http://example.com/different_identity',
+            display_id='http://example.com/different_identity')
+        useropenid.save()
+
+        # Posting in an identity URL begins the authentication request:
+        response = self.client.post('/openid/login/',
+            {'openid_identifier': 'http://example.com/identity',
+             'next': '/getuser/'})
+        self.assertContains(response, 'OpenID transaction in progress')
+
+        # Complete the request, passing back some simple registration
+        # data.  The user is redirected to the next URL.
+        openid_request = self.provider.parseFormPost(response.content)
+        sreg_request = sreg.SRegRequest.fromOpenIDRequest(openid_request)
+        openid_response = openid_request.answer(True)
+        sreg_response = sreg.SRegResponse.extractResponse(
+            sreg_request, {'nickname': 'someuser', 'fullname': 'Some User',
+                           'email': 'foo@example.com'})
+        openid_response.addExtension(sreg_response)
+        response = self.complete(openid_response)
+        
+        # Status code should be 200, since we over-rode the login_failure handler
+        self.assertEquals(200, response.status_code)
+        self.assertContains(response, 'Test Failure Override')
 
     def test_login_requires_sreg_required_fields(self):
         # If any required attributes are not included in the response,
@@ -1054,7 +1200,7 @@ class RelyingPartyTests(TestCase):
         self.assertTrue(self.signal_handler_called)
         openid_login_complete.disconnect(login_callback)
 
-
+    
 class HelperFunctionsTest(TestCase):
     def test_sanitise_redirect_url(self):
         settings.ALLOWED_EXTERNAL_OPENID_REDIRECT_DOMAINS = [

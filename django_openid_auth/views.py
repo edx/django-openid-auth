@@ -51,14 +51,14 @@ from openid.consumer.discover import DiscoveryFailure
 from openid.extensions import sreg, ax, pape
 
 from django_openid_auth import teams
-from django_openid_auth.auth import (
-    RequiredAttributeNotReturned,
-    StrictUsernameViolation,
-    )
 from django_openid_auth.forms import OpenIDLoginForm
 from django_openid_auth.models import UserOpenID
 from django_openid_auth.signals import openid_login_complete
 from django_openid_auth.store import DjangoOpenIDStore
+from django_openid_auth.exceptions import (
+    RequiredAttributeNotReturned,
+    DjangoOpenIDException,
+)
 
 
 next_url_re = re.compile('^/[-\w/]+$')
@@ -122,10 +122,11 @@ def render_openid_request(request, openid_request, return_to, trust_root=None):
 
 
 def default_render_failure(request, message, status=403,
-                           template_name='openid/failure.html'):
+                           template_name='openid/failure.html',
+                           exception=None):
     """Render an error page to the user."""
     data = render_to_string(
-        template_name, dict(message=message),
+        template_name, dict(message=message, exception=exception),
         context_instance=RequestContext(request))
     return HttpResponse(data, status=status)
 
@@ -175,7 +176,8 @@ def login_begin(request, template_name='openid/login.html',
         openid_request = consumer.begin(openid_url)
     except DiscoveryFailure, exc:
         return render_failure(
-            request, "OpenID discovery error: %s" % (str(exc),), status=500)
+            request, "OpenID discovery error: %s" % (str(exc),), status=500,
+            exception=exc)
 
     # Request some user details.  If the provider advertises support
     # for attribute exchange, use that.
@@ -220,7 +222,6 @@ def login_begin(request, template_name='openid/login.html',
         pape_request = pape.Request(preferred_auth_policies=preferred_auth)
         openid_request.addExtension(pape_request)
 
-
     # Request team info
     teams_mapping_auto = getattr(settings, 'OPENID_LAUNCHPAD_TEAMS_MAPPING_AUTO', False)
     teams_mapping_auto_blacklist = getattr(settings, 'OPENID_LAUNCHPAD_TEAMS_MAPPING_AUTO_BLACKLIST', [])
@@ -250,8 +251,11 @@ def login_begin(request, template_name='openid/login.html',
 
 @csrf_exempt
 def login_complete(request, redirect_field_name=REDIRECT_FIELD_NAME,
-                   render_failure=default_render_failure):
+                   render_failure=None):
     redirect_to = request.REQUEST.get(redirect_field_name, '')
+    render_failure = render_failure or \
+                     getattr(settings, 'OPENID_RENDER_FAILURE', None) or \
+                     default_render_failure
 
     openid_response = parse_openid_response(request)
     if not openid_response:
@@ -261,9 +265,9 @@ def login_complete(request, redirect_field_name=REDIRECT_FIELD_NAME,
     if openid_response.status == SUCCESS:
         try:
             user = authenticate(openid_response=openid_response)
-        except (StrictUsernameViolation, RequiredAttributeNotReturned), e:
-            return render_failure(request, e)
-
+        except DjangoOpenIDException, e:
+            return render_failure(request, e.message, exception=e)
+            
         if user is not None:
             if user.is_active:
                 auth_login(request, user)

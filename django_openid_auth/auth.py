@@ -37,16 +37,13 @@ from openid.extensions import ax, sreg, pape
 
 from django_openid_auth import teams
 from django_openid_auth.models import UserOpenID
-
-
-class IdentityAlreadyClaimed(Exception):
-    pass
-
-class StrictUsernameViolation(Exception):
-    pass
-
-class RequiredAttributeNotReturned(Exception):
-    pass
+from django_openid_auth.exceptions import (
+    IdentityAlreadyClaimed,
+    DuplicateUsernameViolation,
+    MissingUsernameViolation,
+    MissingPhysicalMultiFactor,
+    RequiredAttributeNotReturned,
+)
 
 class OpenIDBackend:
     """A django.contrib.auth backend that authenticates the user based on
@@ -92,7 +89,7 @@ class OpenIDBackend:
             pape_response = pape.Response.fromSuccessResponse(openid_response)
             if pape_response is None or \
                pape.AUTH_MULTI_FACTOR_PHYSICAL not in pape_response.auth_policies:
-                return None
+                raise MissingPhysicalMultiFactor()
 
         teams_response = teams.TeamsResponse.fromSuccessResponse(
             openid_response)
@@ -150,6 +147,12 @@ class OpenIDBackend:
                     first_name=first_name, last_name=last_name)
 
     def _get_available_username(self, nickname, identity_url):
+        # If we're being strict about usernames, throw an error if we didn't
+        # get one back from the provider
+        if getattr(settings, 'OPENID_STRICT_USERNAMES', False):
+            if nickname is None or nickname == '':
+                raise MissingUsernameViolation()
+                
         # If we don't have a nickname, and we're not being strict, use a default
         nickname = nickname or 'openiduser'
 
@@ -184,7 +187,7 @@ class OpenIDBackend:
 
         if getattr(settings, 'OPENID_STRICT_USERNAMES', False):
             if User.objects.filter(username__exact=nickname).count() > 0:
-                raise StrictUsernameViolation(
+                raise DuplicateUsernameViolation(
                     "The username (%s) with which you tried to log in is "
                     "already in use for a different account." % nickname)
 
