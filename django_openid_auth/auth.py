@@ -169,8 +169,14 @@ class OpenIDBackend:
                 claimed_id__exact=identity_url,
                 user__username__startswith=nickname)
             # No exception means we have an existing user for this identity
-            # that starts with this nickname, so it's possible we've had to
-            # assign them to nickname+i already.
+            # that starts with this nickname.
+            
+            # If they are an exact match, the user already exists and hasn't
+            # changed their username, so continue to use it
+            if nickname == user_openid.user.username:
+                return nickname
+            
+            # It is possible we've had to assign them to nickname+i already.
             oid_username = user_openid.user.username
             if len(oid_username) > len(nickname):
                 try:

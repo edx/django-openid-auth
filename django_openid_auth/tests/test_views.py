@@ -596,6 +596,33 @@ class RelyingPartyTests(TestCase):
         self.assertEquals(user.last_name, 'User')
         self.assertEquals(user.email, 'foo@example.com')
 
+    def test_login_follow_rename_without_nickname_change(self):
+        settings.OPENID_FOLLOW_RENAMES = True
+        settings.OPENID_UPDATE_DETAILS_FROM_SREG = True
+        settings.OPENID_STRICT_USERNAMES = True
+        user = User.objects.create_user('testuser', 'someone@example.com')
+        useropenid = UserOpenID(
+            user=user,
+            claimed_id='http://example.com/identity',
+            display_id='http://example.com/identity')
+        useropenid.save()
+
+        openid_req = {'openid_identifier': 'http://example.com/identity',
+               'next': '/getuser/'}
+        openid_resp =  {'nickname': 'testuser', 'fullname': 'Some User',
+                 'email': 'foo@example.com'}
+        self._do_user_login(openid_req, openid_resp)
+        response = self.client.get('/getuser/')
+
+        # Username should not have changed
+        self.assertEquals(response.content, 'testuser')
+
+        # The user's full name and email have been updated.
+        user = User.objects.get(username=response.content)
+        self.assertEquals(user.first_name, 'Some')
+        self.assertEquals(user.last_name, 'User')
+        self.assertEquals(user.email, 'foo@example.com')
+
     def test_login_follow_rename_conflict(self):
         settings.OPENID_FOLLOW_RENAMES = True
         settings.OPENID_UPDATE_DETAILS_FROM_SREG = True
