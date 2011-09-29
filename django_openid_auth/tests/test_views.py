@@ -569,6 +569,98 @@ class RelyingPartyTests(TestCase):
         self.assertEquals(user.last_name, 'User')
         self.assertEquals(user.email, 'foo@example.com')
 
+    def test_login_duplicate_username_numbering(self):
+        settings.OPENID_FOLLOW_RENAMES = False
+        settings.OPENID_CREATE_USERS = True
+        settings.OPENID_UPDATE_DETAILS_FROM_SREG = True
+        # Setup existing user who's name we're going to conflict with
+        user = User.objects.create_user('testuser', 'someone@example.com')
+
+        # identity url is for 'renameuser'
+        openid_req = {'openid_identifier': 'http://example.com/identity',
+               'next': '/getuser/'}
+        # but returned username is for 'testuser', which already exists for another identity
+        openid_resp =  {'nickname': 'testuser', 'fullname': 'Test User',
+                 'email': 'test@example.com'}
+        self._do_user_login(openid_req, openid_resp)
+        response = self.client.get('/getuser/')
+
+        # Since this username is already taken by someone else, we go through
+        # the process of adding +i to it, and get testuser2.
+        self.assertEquals(response.content, 'testuser2')
+
+    def test_login_duplicate_username_numbering_with_conflicts(self):
+        settings.OPENID_FOLLOW_RENAMES = False
+        settings.OPENID_CREATE_USERS = True
+        settings.OPENID_UPDATE_DETAILS_FROM_SREG = True
+        # Setup existing user who's name we're going to conflict with
+        user = User.objects.create_user('testuser', 'someone@example.com')
+        user = User.objects.create_user('testuser3', 'someone@example.com')
+
+        # identity url is for 'renameuser'
+        openid_req = {'openid_identifier': 'http://example.com/identity',
+               'next': '/getuser/'}
+        # but returned username is for 'testuser', which already exists for another identity
+        openid_resp =  {'nickname': 'testuser', 'fullname': 'Test User',
+                 'email': 'test@example.com'}
+        self._do_user_login(openid_req, openid_resp)
+        response = self.client.get('/getuser/')
+
+        # Since this username is already taken by someone else, we go through
+        # the process of adding +i to it starting with the count of users with
+        # username starting with 'testuser', of which there are 2.  i should
+        # start at 3, which already exists, so it should skip to 4.
+        self.assertEquals(response.content, 'testuser4')
+
+    def test_login_duplicate_username_numbering_with_holes(self):
+        settings.OPENID_FOLLOW_RENAMES = False
+        settings.OPENID_CREATE_USERS = True
+        settings.OPENID_UPDATE_DETAILS_FROM_SREG = True
+        # Setup existing user who's name we're going to conflict with
+        user = User.objects.create_user('testuser', 'someone@example.com')
+        user = User.objects.create_user('testuser1', 'someone@example.com')
+        user = User.objects.create_user('testuser6', 'someone@example.com')
+        user = User.objects.create_user('testuser7', 'someone@example.com')
+        user = User.objects.create_user('testuser8', 'someone@example.com')
+
+        # identity url is for 'renameuser'
+        openid_req = {'openid_identifier': 'http://example.com/identity',
+               'next': '/getuser/'}
+        # but returned username is for 'testuser', which already exists for another identity
+        openid_resp =  {'nickname': 'testuser', 'fullname': 'Test User',
+                 'email': 'test@example.com'}
+        self._do_user_login(openid_req, openid_resp)
+        response = self.client.get('/getuser/')
+
+        # Since this username is already taken by someone else, we go through
+        # the process of adding +i to it starting with the count of users with
+        # username starting with 'testuser', of which there are 5.  i should
+        # start at 6, and increment until it reaches 9.
+        self.assertEquals(response.content, 'testuser9')
+
+    def test_login_duplicate_username_numbering_with_nonsequential_matches(self):
+        settings.OPENID_FOLLOW_RENAMES = False
+        settings.OPENID_CREATE_USERS = True
+        settings.OPENID_UPDATE_DETAILS_FROM_SREG = True
+        # Setup existing user who's name we're going to conflict with
+        user = User.objects.create_user('testuser', 'someone@example.com')
+        user = User.objects.create_user('testuserfoo', 'someone@example.com')
+
+        # identity url is for 'renameuser'
+        openid_req = {'openid_identifier': 'http://example.com/identity',
+               'next': '/getuser/'}
+        # but returned username is for 'testuser', which already exists for another identity
+        openid_resp =  {'nickname': 'testuser', 'fullname': 'Test User',
+                 'email': 'test@example.com'}
+        self._do_user_login(openid_req, openid_resp)
+        response = self.client.get('/getuser/')
+
+        # Since this username is already taken by someone else, we go through
+        # the process of adding +i to it starting with the count of users with
+        # username starting with 'testuser', of which there are 2.  i should
+        # start at 3, which will be available.
+        self.assertEquals(response.content, 'testuser3')
+
     def test_login_follow_rename(self):
         settings.OPENID_FOLLOW_RENAMES = True
         settings.OPENID_UPDATE_DETAILS_FROM_SREG = True
