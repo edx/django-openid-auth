@@ -62,6 +62,7 @@ admin.site.register(Association, AssociationAdmin)
 
 
 class UserOpenIDAdmin(admin.ModelAdmin):
+    raw_id_fields = ('user',)
     list_display = ('user', 'claimed_id')
     search_fields = ('claimed_id',)
 
