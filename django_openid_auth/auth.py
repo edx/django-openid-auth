@@ -49,6 +49,9 @@ class OpenIDBackend:
     """A django.contrib.auth backend that authenticates the user based on
     an OpenID response."""
 
+    supports_object_permissions = False
+    supports_anonymous_user = True
+
     def get_user(self, user_id):
         try:
             return User.objects.get(pk=user_id)
@@ -198,10 +201,8 @@ class OpenIDBackend:
                     "already in use for a different account." % nickname)
 
         # Pick a username for the user based on their nickname,
-        # checking for conflicts.  Start with number of existing users who's
-        # username starts with this nickname to avoid having to iterate over
-        # all of the existing ones.
-        i = User.objects.filter(username__startswith=nickname).count() + 1
+        # checking for conflicts.
+        i = 1
         while True:
             username = nickname
             if i > 1:

@@ -76,7 +76,7 @@ if getattr(settings, 'OPENID_USE_AS_ADMIN_LOGIN', False):
     def _openid_login(self, request, error_message='', extra_context=None):
         if request.user.is_authenticated():
             if not request.user.is_staff:
-                return views.render_failure(
+                return views.default_render_failure(
                     request, "User %s does not have admin access."
                     % request.user.username)
             return views.render_failure(
@@ -87,4 +87,4 @@ if getattr(settings, 'OPENID_USE_AS_ADMIN_LOGIN', False):
                 settings.LOGIN_URL + "?next=" + request.get_full_path())
 
     # Overide the standard admin login form.
-    admin.sites.AdminSite.display_login_form = _openid_login
+    admin.sites.AdminSite.login = _openid_login
