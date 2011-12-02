@@ -79,7 +79,7 @@ if getattr(settings, 'OPENID_USE_AS_ADMIN_LOGIN', False):
                 return views.default_render_failure(
                     request, "User %s does not have admin access."
                     % request.user.username)
-            assert "Unknown Error: %s" % error_message
+            assert error_message, "Unknown Error: %s" % error_message
         else:
             # Redirect to openid login path,
             return HttpResponseRedirect(
