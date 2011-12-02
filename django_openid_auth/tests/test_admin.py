@@ -73,17 +73,6 @@ class SiteAdminTests(TestCase):
         self.assertTrue('User testing does not have admin access.' in
                         response.content, 'Missing error message in response')
 
-    def dont_admin_site_with_openid_login_authenticated_and_staff(self):
-        """
-        If the request has an authenticated user, who is flagged as a
-        staff member, then they get a error response.
-        """
-        create_user(is_staff=True)
-        self.client.login(username='testing', password='test')
-        response = self.client.get('/admin/')
-        self.assertTrue('Unknown Error: ' in
-                        response.content, 'Missing error message in response')
-
     def test_admin_site_with_openid_login_non_authenticated_user(self):
         """
         Unauthenticated users accessing the admin page should be directed to
