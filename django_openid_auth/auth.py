@@ -201,8 +201,10 @@ class OpenIDBackend:
                     "already in use for a different account." % nickname)
 
         # Pick a username for the user based on their nickname,
-        # checking for conflicts.
-        i = 1
+        # checking for conflicts.  Start with number of existing users who's
+        # username starts with this nickname to avoid having to iterate over
+        # all of the existing ones.
+        i = User.objects.filter(username__startswith=nickname).count() + 1
         while True:
             username = nickname
             if i > 1:
