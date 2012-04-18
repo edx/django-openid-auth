@@ -27,6 +27,7 @@
 # ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+import django
 from django.conf import settings
 from django.contrib import admin
 from django_openid_auth.models import Nonce, Association, UserOpenID
@@ -86,4 +87,7 @@ if getattr(settings, 'OPENID_USE_AS_ADMIN_LOGIN', False):
                 settings.LOGIN_URL + "?next=" + request.get_full_path())
 
     # Overide the standard admin login form.
-    admin.sites.AdminSite.display_login_form = _openid_login
+    if django.VERSION < (1, 3, 1, 'final'):
+        admin.sites.AdminSite.login = _openid_login
+    else:
+        admin.sites.AdminSite.display_login_form = _openid_login

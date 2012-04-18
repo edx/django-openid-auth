@@ -31,9 +31,11 @@ Tests for the django_openid_auth Admin login form replacement.
 
 import os
 import unittest
+import django
 
 from django.conf import settings
 from django.contrib.auth.models import User, AnonymousUser
+
 
 settings.OPENID_USE_AS_ADMIN_LOGIN = True
 from django_openid_auth import admin
