@@ -244,7 +244,11 @@ def login_begin(request, template_name='openid/login.html',
             return_to += '&'
         else:
             return_to += '?'
-        return_to += urllib.urlencode({redirect_field_name: redirect_to})
+        # Django gives us Unicode, which is great.  We must encode URI. urllib
+        # dumbly enforces str. We can't trust anything about the default
+        # encoding inside  str(foo) , so we must explicitly make foo a str.
+        return_to += urllib.urlencode(
+                {redirect_field_name: redirect_to.encode("UTF-8")})
 
     return render_openid_request(request, openid_request, return_to)
 
