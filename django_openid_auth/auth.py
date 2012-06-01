@@ -146,6 +146,16 @@ class OpenIDBackend:
         return dict(email=email, nickname=nickname,
                     first_name=first_name, last_name=last_name)
 
+    def _get_preferred_username(self, nickname, email):
+        if nickname:
+            return nickname
+        if email and getattr(settings, 'OPENID_USE_EMAIL_FOR_USERNAME',
+            False):
+            suggestion = ''.join([x for x in email if x.isalnum()])
+            if suggestion:
+                return suggestion
+        return 'openiduser'
+
     def _get_available_username(self, nickname, identity_url):
         # If we're being strict about usernames, throw an error if we didn't
         # get one back from the provider
@@ -225,10 +235,12 @@ class OpenIDBackend:
                     "An attribute required for logging in was not "
                     "returned ({0}).".format(required_attr))
 
-        nickname = details['nickname'] or 'openiduser'
+        nickname = self._get_preferred_username(details['nickname'],
+            details['email'])
         email = details['email'] or ''
 
-        username = self._get_available_username(details['nickname'], openid_response.identity_url)
+        username = self._get_available_username(nickname,
+            openid_response.identity_url)
 
         user = User.objects.create_user(username, email, password=None)
         self.associate_openid(user, openid_response)

@@ -166,3 +166,14 @@ Where failure_handler_function is a function reference that will take the follow
 
 This function must return a Django.http.HttpResponse instance.
 
+== Use the user's email for suggested usernames ==
+
+You can optionally strip out non-alphanumeric characters from the user's email
+to generate a preferred username, if the server doesn't provide nick
+information, by setting the following setting:
+
+        OPENID_USE_EMAIL_FOR_USERNAME = True
+
+Otherwise, and by default, if the server omits nick information and a user is
+created it'll receive a username 'openiduser' + a number.
+Consider also the OPENID_STRICT_USERNAMES setting (see ``Require a valid nickname``)

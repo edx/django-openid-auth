@@ -42,7 +42,7 @@ from openid.fetchers import (
 from openid.oidutil import importElementTree
 from openid.server.server import BROWSER_REQUEST_MODES, ENCODE_URL, Server
 from openid.store.memstore import MemoryStore
-from openid.message import OPENID1_URL_LIMIT, IDENTIFIER_SELECT
+from openid.message import IDENTIFIER_SELECT
 
 from django_openid_auth import teams
 from django_openid_auth.models import UserOpenID
@@ -50,7 +50,6 @@ from django_openid_auth.views import (
     sanitise_redirect_url, 
     make_consumer,
 )
-from django_openid_auth.auth import OpenIDBackend
 from django_openid_auth.signals import openid_login_complete
 from django_openid_auth.store import DjangoOpenIDStore
 from django_openid_auth.exceptions import (
@@ -185,6 +184,8 @@ class RelyingPartyTests(TestCase):
         self.old_physical_multifactor = getattr(settings, 'OPENID_PHYSICAL_MULTIFACTOR_REQUIRED', False)
         self.old_login_render_failure = getattr(settings, 'OPENID_RENDER_FAILURE', None)
         self.old_consumer_complete = Consumer.complete
+        self.old_openid_use_email_for_username = getattr(settings,
+            'OPENID_USE_EMAIL_FOR_USERNAME', False)
 
         self.old_required_fields = getattr(
             settings, 'OPENID_SREG_REQUIRED_FIELDS', [])
@@ -198,6 +199,7 @@ class RelyingPartyTests(TestCase):
         settings.OPENID_FOLLOW_RENAMES = False
         settings.OPENID_PHYSICAL_MULTIFACTOR_REQUIRED = False
         settings.OPENID_SREG_REQUIRED_FIELDS = []
+        settings.OPENID_USE_EMAIL_FOR_USERNAME = False
 
     def tearDown(self):
         settings.LOGIN_REDIRECT_URL = self.old_login_redirect_url
@@ -212,6 +214,7 @@ class RelyingPartyTests(TestCase):
         settings.OPENID_RENDER_FAILURE = self.old_login_render_failure
         Consumer.complete = self.old_consumer_complete
         settings.OPENID_SREG_REQUIRED_FIELDS = self.old_required_fields
+        settings.OPENID_USE_EMAIL_FOR_USERNAME = self.old_openid_use_email_for_username
 
         setDefaultFetcher(None)
         super(RelyingPartyTests, self).tearDown()
@@ -568,6 +571,20 @@ class RelyingPartyTests(TestCase):
         self.assertEquals(user.first_name, 'Openid')
         self.assertEquals(user.last_name, 'User')
         self.assertEquals(user.email, 'foo@example.com')
+
+    def test_login_without_nickname_with_email_suggestion(self):
+        settings.OPENID_CREATE_USERS = True
+        settings.OPENID_USE_EMAIL_FOR_USERNAME = True
+
+        openid_req = {'openid_identifier': 'http://example.com/identity',
+               'next': '/getuser/'}
+        openid_resp =  {'nickname': '', 'fullname': 'Openid User',
+                 'email': 'foo@example.com'}
+        self._do_user_login(openid_req, openid_resp)
+        response = self.client.get('/getuser/')
+
+        # username defaults to a munged version of the email
+        self.assertEquals(response.content, 'fooexamplecom')
 
     def test_login_duplicate_username_numbering(self):
         settings.OPENID_FOLLOW_RENAMES = False
