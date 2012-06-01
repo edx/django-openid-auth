@@ -28,6 +28,7 @@
 
 import unittest
 
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.test import TestCase
 
@@ -45,6 +46,12 @@ class OpenIDBackendTests(TestCase):
     def setUp(self):
         super(OpenIDBackendTests, self).setUp()
         self.backend = OpenIDBackend()
+        self.old_openid_use_email_for_username = getattr(settings,
+            'OPENID_USE_EMAIL_FOR_USERNAME', False)
+
+    def tearDown(self):
+        settings.OPENID_USE_EMAIL_FOR_USERNAME = \
+            self.old_openid_use_email_for_username
 
     def test_extract_user_details_sreg(self):
         endpoint = OpenIDServiceEndpoint()
@@ -149,6 +156,29 @@ class OpenIDBackendTests(TestCase):
 
         self.assertEqual("Some", data['first_name'])
         self.assertEqual("User", data['last_name'])
+
+    def test_preferred_username_email_munging(self):
+        settings.OPENID_USE_EMAIL_FOR_USERNAME = True
+        for nick, email, expected in [
+            ('nickcomesfirst', 'foo@example.com', 'nickcomesfirst'),
+            ('', 'foo@example.com', 'fooexamplecom'),
+            ('noemail', '', 'noemail'),
+            ('', '@%.-', 'openiduser'),
+            ('', '', 'openiduser'),
+            (None, None, 'openiduser')]:
+            self.assertEqual(expected,
+                self.backend._get_preferred_username(nick, email))
+
+    def test_preferred_username_no_email_munging(self):
+        for nick, email, expected in [
+            ('nickcomesfirst', 'foo@example.com', 'nickcomesfirst'),
+            ('', 'foo@example.com', 'openiduser'),
+            ('noemail', '', 'noemail'),
+            ('', '@%.-', 'openiduser'),
+            ('', '', 'openiduser'),
+            (None, None, 'openiduser')]:
+            self.assertEqual(expected,
+                self.backend._get_preferred_username(nick, email))
 
 
 def suite():
