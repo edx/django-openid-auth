@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # django-openid-auth -  OpenID integration for django.contrib.auth
 #
-# Copyright (C) 2009-2010 Canonical Ltd.
+# Copyright (C) 2009-2013 Canonical Ltd.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -43,7 +43,7 @@ from distutils.core import setup
 
 
 description, long_description = __doc__.split('\n\n', 1)
-VERSION = '0.4'
+VERSION = '0.5'
 
 setup(
     name='django-openid-auth',
