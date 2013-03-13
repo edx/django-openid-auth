@@ -1,6 +1,7 @@
+# -*- coding: utf-8 -*-
 # django-openid-auth -  OpenID integration for django.contrib.auth
 #
-# Copyright (C) 2009-2010 Canonical Ltd.
+# Copyright (C) 2009-2013 Canonical Ltd.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -263,6 +264,14 @@ class RelyingPartyTests(TestCase):
         # And they are now logged in:
         response = self.client.get('/getuser/')
         self.assertEquals(response.content, 'someuser')
+
+    def test_login_with_nonascii_return_to(self):
+        """Ensure non-ascii characters can be used for the 'next' arg."""
+        for url in [u'/files/moño.jpg', u'/files/ñandú.jpg'.encode('utf-8')]:
+            response = self.client.post('/openid/login/',
+                {'openid_identifier': 'http://example.com/identity',
+                 'next': url})
+            self.assertContains(response, 'OpenID transaction in progress')
 
     def test_login_no_next(self):
         """Logins with no next parameter redirect to LOGIN_REDIRECT_URL."""
