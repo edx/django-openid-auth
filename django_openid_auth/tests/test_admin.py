@@ -29,14 +29,12 @@
 Tests for the django_openid_auth Admin login form replacement.
 """
 
-import os
 import unittest
 
 from django.conf import settings
 from django.contrib.auth.models import User, AnonymousUser
 
 settings.OPENID_USE_AS_ADMIN_LOGIN = True
-from django_openid_auth import admin
 
 from django.test import TestCase
 
@@ -80,7 +78,8 @@ class SiteAdminTests(TestCase):
         """
         response = self.client.get('/admin/')
         self.assertEqual(302, response.status_code)
-        self.assertEqual('http://testserver/openid/login/?next=/admin/',
+        self.assertEqual('http://testserver' + getattr(settings, 'LOGIN_URL',
+                         '/openid/login') + '?next=/admin/',
                          response['Location'])
 
 
