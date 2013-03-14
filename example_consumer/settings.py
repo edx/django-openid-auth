@@ -39,7 +39,7 @@ ADMINS = (
 
 MANAGERS = ADMINS
 
-if django_version >= "1.1.2": 
+if django_version >= "1.2": 
     csrf_middleware = 'django.middleware.csrf.CsrfViewMiddleware'
     DATABASES = {
                      'default': {

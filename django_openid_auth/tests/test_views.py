@@ -267,11 +267,10 @@ class RelyingPartyTests(TestCase):
 
     def test_login_with_nonascii_return_to(self):
         """Ensure non-ascii characters can be used for the 'next' arg."""
-        for url in [u'/files/moño.jpg', u'/files/ñandú.jpg'.encode('utf-8')]:
-            response = self.client.post('/openid/login/',
-                {'openid_identifier': 'http://example.com/identity',
-                 'next': url})
-            self.assertContains(response, 'OpenID transaction in progress')
+        response = self.client.post('/openid/login/',
+            {'openid_identifier': 'http://example.com/identity',
+             'next': u'/files/ñandú.jpg'.encode('utf-8')})
+        self.assertContains(response, 'OpenID transaction in progress')
 
     def test_login_no_next(self):
         """Logins with no next parameter redirect to LOGIN_REDIRECT_URL."""
