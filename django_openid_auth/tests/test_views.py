@@ -169,9 +169,10 @@ class RelyingPartyTests(TestCase):
         self.req = DummyDjangoRequest('http://localhost/')
         self.endpoint = OpenIDServiceEndpoint()
         self.endpoint.claimed_id = 'http://example.com/identity'
-        self.endpoint.server_url = 'http://example.com/'
+        server_url = 'http://example.com/'
+        self.endpoint.server_url = server_url
         self.consumer = make_consumer(self.req)
-        self.server = Server(DjangoOpenIDStore())
+        self.server = Server(DjangoOpenIDStore(), op_endpoint=server_url)
         setDefaultFetcher(self.provider, wrap_exceptions=False)
 
         self.old_login_redirect_url = getattr(settings, 'LOGIN_REDIRECT_URL', '/accounts/profile/')
