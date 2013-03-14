@@ -28,7 +28,8 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 # Django settings for example project.
-
+import django
+django_version = django.get_version()
 DEBUG = True
 TEMPLATE_DEBUG = DEBUG
 
@@ -38,12 +39,30 @@ ADMINS = (
 
 MANAGERS = ADMINS
 
-DATABASE_ENGINE = 'sqlite3'           # 'postgresql_psycopg2', 'postgresql', 'mysql', 'sqlite3' or 'ado_mssql'.
-DATABASE_NAME = 'sqlite.db'             # Or path to database file if using sqlite3.
-DATABASE_USER = ''             # Not used with sqlite3.
-DATABASE_PASSWORD = ''         # Not used with sqlite3.
-DATABASE_HOST = ''             # Set to empty string for localhost. Not used with sqlite3.
-DATABASE_PORT = ''             # Set to empty string for default. Not used with sqlite3.
+if django_version >= "1.1.2": 
+    csrf_middleware = 'django.middleware.csrf.CsrfViewMiddleware'
+    DATABASES = {
+                     'default': {
+                         'ENGINE': 'django.db.backends.sqlite3',
+                         'NAME': 'sqlite.db'
+                     }
+                 }
+    TEMPLATE_LOADERS = (
+        'django.template.loaders.filesystem.Loader',
+        'django.template.loaders.app_directories.Loader',
+    )
+else:
+    csrf_middleware = 'django.contrib.csrf.middleware.CsrfViewMiddleware'
+    TEMPLATE_LOADERS = (
+        'django.template.loaders.filesystem.load_template_source',
+        'django.template.loaders.app_directories.load_template_source',
+     )
+    DATABASE_ENGINE = 'sqlite3'           # 'postgresql_psycopg2', 'postgresql', 'mysql', 'sqlite3' or 'ado_mssql'.
+    DATABASE_NAME = 'sqlite.db'             # Or path to database file if using sqlite3.
+    DATABASE_USER = ''             # Not used with sqlite3.
+    DATABASE_PASSWORD = ''         # Not used with sqlite3.
+    DATABASE_HOST = ''             # Set to empty string for localhost. Not used with sqlite3.
+    DATABASE_PORT = ''             # Set to empty string for default. Not used with sqlite3.
 
 # Local time zone for this installation. Choices can be found here:
 # http://www.postgresql.org/docs/8.1/static/datetime-keywords.html#DATETIME-TIMEZONE-SET-TABLE
@@ -78,23 +97,6 @@ ADMIN_MEDIA_PREFIX = '/media/'
 
 # Make this unique, and don't share it with anybody.
 SECRET_KEY = '34958734985734985734985798437'
-
-# List of callables that know how to import templates from various sources.
-TEMPLATE_LOADERS = (
-    'django.template.loaders.filesystem.load_template_source',
-    'django.template.loaders.app_directories.load_template_source',
-#     'django.template.loaders.eggs.load_template_source',
-)
-
-# django-openid-auth will *not* work with Django 1.1.1 or older, as it's
-# missing the csrf_token template tag.  This will allow it to work with
-# Django 1.1.2 or later:
-try: 
-    import django.middleware.csrf
-except ImportError:
-    csrf_middleware = 'django.contrib.csrf.middleware.CsrfViewMiddleware'
-else:
-    csrf_middleware = 'django.middleware.csrf.CsrfViewMiddleware'
 
 MIDDLEWARE_CLASSES = (
     'django.middleware.common.CommonMiddleware',
