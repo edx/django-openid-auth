@@ -104,6 +104,7 @@ class OpenIDBackend:
 
     def _extract_user_details(self, openid_response):
         email = fullname = first_name = last_name = nickname = None
+        verified = 'no'
         sreg_response = sreg.SRegResponse.fromSuccessResponse(openid_response)
         if sreg_response:
             email = sreg_response.get('email')
@@ -134,6 +135,8 @@ class OpenIDBackend:
                 'http://axschema.org/namePerson/last', last_name)
             nickname = fetch_response.getSingle(
                 'http://axschema.org/namePerson/friendly', nickname)
+            verified = fetch_response.getSingle(
+                'http://ns.login.ubuntu.com/2013/validation/account', verified)
 
         if fullname and not (first_name or last_name):
             # Django wants to store first and last names separately,
@@ -146,7 +149,9 @@ class OpenIDBackend:
                 first_name = u''
                 last_name = fullname
 
-        return dict(email=email, nickname=nickname,
+        verified = verified != 'no'
+
+        return dict(email=email, nickname=nickname, account_verified=verified,
                     first_name=first_name, last_name=last_name)
 
     def _get_preferred_username(self, nickname, email):

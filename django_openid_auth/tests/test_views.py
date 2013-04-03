@@ -1163,6 +1163,9 @@ class RelyingPartyTests(TestCase):
                 'http://schema.openid.net/namePerson'))
         self.assertTrue(fetch_request.has_key(
                 'http://schema.openid.net/namePerson/friendly'))
+        # Account verification:
+        self.assertTrue(fetch_request.has_key(
+                'http://ns.login.ubuntu.com/2013/validation/account'))
 
         # Build up a response including AX data.
         openid_response = openid_request.answer(True)
@@ -1175,6 +1178,9 @@ class RelyingPartyTests(TestCase):
             'http://axschema.org/namePerson/last', 'Lastname')
         fetch_response.addValue(
             'http://axschema.org/namePerson/friendly', 'someuser')
+        fetch_response.addValue(
+            'http://ns.login.ubuntu.com/2013/validation/account',
+            'token_via_email')
         openid_response.addExtension(fetch_response)
         response = self.complete(openid_response)
         self.assertRedirects(response, 'http://testserver/getuser/')

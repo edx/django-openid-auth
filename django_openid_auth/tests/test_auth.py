@@ -66,17 +66,21 @@ class OpenIDBackendTests(TestCase):
         self.assertEqual(data, {"nickname": "someuser",
                                 "first_name": "Some",
                                 "last_name": "User",
-                                "email": "foo@example.com"})
+                                "email": "foo@example.com",
+                                "account_verified": False})
 
     def make_response_ax(self, schema="http://axschema.org/",
-        fullname="Some User", nickname="someuser", email="foo@example.com",
-        first=None, last=None):
+            fullname="Some User", nickname="someuser", email="foo@example.com",
+            first=None, last=None, verified=True):
         endpoint = OpenIDServiceEndpoint()
         message = Message(OPENID2_NS)
         attributes = [
             ("nickname", schema + "namePerson/friendly", nickname),
             ("fullname", schema + "namePerson", fullname),
             ("email", schema + "contact/email", email),
+            ("account_verified",
+             "http://ns.login.ubuntu.com/2013/validation/account",
+             "token_via_email" if verified else "no")
             ]
         if first:
             attributes.append(
@@ -101,7 +105,8 @@ class OpenIDBackendTests(TestCase):
         self.assertEqual(data, {"nickname": "someuser",
                                 "first_name": "Some",
                                 "last_name": "User",
-                                "email": "foo@example.com"})
+                                "email": "foo@example.com",
+                                "account_verified": True})
 
     def test_extract_user_details_ax_split_name(self):
         # Include fullname too to show that the split data takes
@@ -114,7 +119,8 @@ class OpenIDBackendTests(TestCase):
         self.assertEqual(data, {"nickname": "someuser",
                                 "first_name": "Some",
                                 "last_name": "User",
-                                "email": "foo@example.com"})
+                                "email": "foo@example.com",
+                                "account_verified": True})
 
     def test_extract_user_details_ax_broken_myopenid(self):
         response = self.make_response_ax(
@@ -126,7 +132,8 @@ class OpenIDBackendTests(TestCase):
         self.assertEqual(data, {"nickname": "someuser",
                                 "first_name": "Some",
                                 "last_name": "User",
-                                "email": "foo@example.com"})
+                                "email": "foo@example.com",
+                                "account_verified": True})
 
     def test_update_user_details_long_names(self):
         response = self.make_response_ax()
