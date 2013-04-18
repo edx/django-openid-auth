@@ -361,9 +361,11 @@ class RelyingPartyTests(TestCase):
         self.assertEquals(user.last_name, 'User')
         self.assertEquals(user.email, 'foo@example.com')
 
-    def _do_user_login(self, req_data, resp_data, use_sreg=True, use_pape=None):
+    def _do_user_login(self, req_data, resp_data, use_sreg=True,
+                       use_pape=None):
         openid_request = self._get_login_request(req_data)
-        openid_response = self._get_login_response(openid_request, resp_data, use_sreg, use_pape)
+        openid_response = self._get_login_response(
+            openid_request, resp_data, use_sreg, use_pape)
         response = self.complete(openid_response)
         self.assertRedirects(response, 'http://testserver/getuser/')
         return response
@@ -378,7 +380,8 @@ class RelyingPartyTests(TestCase):
         openid_request = self.provider.parseFormPost(response.content)
         return openid_request
 
-    def _get_login_response(self, openid_request, resp_data, use_sreg, use_pape):
+    def _get_login_response(self, openid_request, resp_data, use_sreg,
+                            use_pape):
         openid_response = openid_request.answer(True)
 
         if use_sreg:
@@ -1195,6 +1198,9 @@ class RelyingPartyTests(TestCase):
         self.assertEquals(user.first_name, 'Firstname')
         self.assertEquals(user.last_name, 'Lastname')
         self.assertEquals(user.email, 'foo@example.com')
+        # And the verified status of their UserOpenID
+        user_openid = UserOpenID.objects.get(user=user)
+        self.assertTrue(user_openid.account_verified)
 
     def test_login_teams(self):
         settings.OPENID_LAUNCHPAD_TEAMS_MAPPING_AUTO = False

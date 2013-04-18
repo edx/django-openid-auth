@@ -56,3 +56,4 @@ class UserOpenID(models.Model):
     user = models.ForeignKey(User)
     claimed_id = models.TextField(max_length=2047, unique=True)
     display_id = models.TextField(max_length=2047)
+    account_verified = models.BooleanField(default=False)

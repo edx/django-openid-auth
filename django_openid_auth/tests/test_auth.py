@@ -33,6 +33,7 @@ from django.contrib.auth.models import User
 from django.test import TestCase
 
 from django_openid_auth.auth import OpenIDBackend
+from django_openid_auth.models import UserOpenID
 from openid.consumer.consumer import SuccessResponse
 from openid.consumer.discover import OpenIDServiceEndpoint
 from openid.message import Message, OPENID2_NS
@@ -71,7 +72,7 @@ class OpenIDBackendTests(TestCase):
 
     def make_response_ax(self, schema="http://axschema.org/",
             fullname="Some User", nickname="someuser", email="foo@example.com",
-            first=None, last=None, verified=True):
+            first=None, last=None, verified=False):
         endpoint = OpenIDServiceEndpoint()
         message = Message(OPENID2_NS)
         attributes = [
@@ -106,7 +107,7 @@ class OpenIDBackendTests(TestCase):
                                 "first_name": "Some",
                                 "last_name": "User",
                                 "email": "foo@example.com",
-                                "account_verified": True})
+                                "account_verified": False})
 
     def test_extract_user_details_ax_split_name(self):
         # Include fullname too to show that the split data takes
@@ -120,7 +121,7 @@ class OpenIDBackendTests(TestCase):
                                 "first_name": "Some",
                                 "last_name": "User",
                                 "email": "foo@example.com",
-                                "account_verified": True})
+                                "account_verified": False})
 
     def test_extract_user_details_ax_broken_myopenid(self):
         response = self.make_response_ax(
@@ -133,7 +134,7 @@ class OpenIDBackendTests(TestCase):
                                 "first_name": "Some",
                                 "last_name": "User",
                                 "email": "foo@example.com",
-                                "account_verified": True})
+                                "account_verified": False})
 
     def test_update_user_details_long_names(self):
         response = self.make_response_ax()
@@ -141,12 +142,44 @@ class OpenIDBackendTests(TestCase):
             password=None)
         data = dict(first_name=u"Some56789012345678901234567890123",
             last_name=u"User56789012345678901234567890123",
-            email=u"someotheruser@example.com")
+            email=u"someotheruser@example.com", account_verified=False)
 
         self.backend.update_user_details(user, data, response)
 
         self.assertEqual("Some56789012345678901234567890",  user.first_name)
         self.assertEqual("User56789012345678901234567890",  user.last_name)
+
+    def test_update_user_openid_unverified(self):
+        user = User.objects.create_user('someuser', 'someuser@example.com',
+            password=None)
+        user_openid = UserOpenID.objects.get_or_create(
+            user=user,
+            claimed_id='http://example.com/existing_identity',
+            display_id='http://example.com/existing_identity',
+            account_verified=False)
+        data = dict(first_name=u"Some56789012345678901234567890123",
+            last_name=u"User56789012345678901234567890123",
+            email=u"someotheruser@example.com", account_verified=False)
+
+        user_openid = UserOpenID.objects.get(user=user)
+        self.backend.update_user_openid(user_openid, data)
+        self.assertFalse(user_openid.account_verified)
+
+    def test_update_user_openid_verified(self):
+        user = User.objects.create_user('someuser', 'someuser@example.com',
+            password=None)
+        user_openid = UserOpenID.objects.get_or_create(
+            user=user,
+            claimed_id='http://example.com/existing_identity',
+            display_id='http://example.com/existing_identity',
+            account_verified=False)
+        data = dict(first_name=u"Some56789012345678901234567890123",
+            last_name=u"User56789012345678901234567890123",
+            email=u"someotheruser@example.com", account_verified=True)
+
+        user_openid = UserOpenID.objects.get(user=user)
+        self.backend.update_user_openid(user_openid, data)
+        self.assertTrue(user_openid.account_verified)
 
     def test_extract_user_details_name_with_trailing_space(self):
         response = self.make_response_ax(fullname="SomeUser ")

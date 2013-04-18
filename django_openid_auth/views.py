@@ -56,7 +56,6 @@ from django_openid_auth.models import UserOpenID
 from django_openid_auth.signals import openid_login_complete
 from django_openid_auth.store import DjangoOpenIDStore
 from django_openid_auth.exceptions import (
-    RequiredAttributeNotReturned,
     DjangoOpenIDException,
 )
 

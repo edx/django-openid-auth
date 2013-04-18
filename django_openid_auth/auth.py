@@ -78,6 +78,8 @@ class OpenIDBackend:
         except UserOpenID.DoesNotExist:
             if getattr(settings, 'OPENID_CREATE_USERS', False):
                 user = self.create_user_from_openid(openid_response)
+                user_openid = UserOpenID.objects.get(
+                    claimed_id__exact=openid_response.identity_url)
         else:
             user = user_openid.user
 
@@ -87,6 +89,7 @@ class OpenIDBackend:
         if getattr(settings, 'OPENID_UPDATE_DETAILS_FROM_SREG', False):
             details = self._extract_user_details(openid_response)
             self.update_user_details(user, details, openid_response)
+            self.update_user_openid(user_openid, details)
 
         if getattr(settings, 'OPENID_PHYSICAL_MULTIFACTOR_REQUIRED', False):
             pape_response = pape.Response.fromSuccessResponse(openid_response)
@@ -275,6 +278,14 @@ class OpenIDBackend:
                     % openid_response.identity_url)
 
         return user_openid
+
+    def update_user_openid(self, user_openid, details):
+        updated = False
+        if details['account_verified'] is not None:
+            user_openid.account_verified = details['account_verified']
+            updated = True
+        if updated:
+            user_openid.save()
 
     def update_user_details(self, user, details, openid_response):
         updated = False
