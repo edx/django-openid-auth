@@ -1223,6 +1223,58 @@ class RelyingPartyTests(TestCase):
         user_openid = UserOpenID.objects.get(user=user)
         self.assertTrue(user_openid.account_verified)
 
+    def test_login_attribute_exchange_unrecognised_validation(self):
+        settings.OPENID_UPDATE_DETAILS_FROM_SREG = True
+        user = User.objects.create_user('testuser', 'someone@example.com')
+        useropenid = UserOpenID(
+            user=user,
+            claimed_id='http://example.com/identity',
+            display_id='http://example.com/identity',
+            account_verified=False)
+        useropenid.save()
+
+        # Configure the provider to advertise attribute exchange
+        # protocol and start the authentication process:
+        self.provider.type_uris.append('http://openid.net/srv/ax/1.0')
+        response = self.client.post('/openid/login/',
+            {'openid_identifier': 'http://example.com/identity',
+             'next': '/getuser/'})
+        self.assertContains(response, 'OpenID transaction in progress')
+
+        openid_request = self.provider.parseFormPost(response.content)
+        fetch_request = ax.FetchRequest.fromOpenIDRequest(openid_request)
+        # Build up a response including AX data.
+        openid_response = openid_request.answer(True)
+        fetch_response = ax.FetchResponse(fetch_request)
+        fetch_response.addValue(
+            'http://axschema.org/contact/email', 'foo@example.com')
+        fetch_response.addValue(
+            'http://axschema.org/namePerson/first', 'Firstname')
+        fetch_response.addValue(
+            'http://axschema.org/namePerson/last', 'Lastname')
+        fetch_response.addValue(
+            'http://axschema.org/namePerson/friendly', 'someuser')
+        fetch_response.addValue(
+            'http://ns.login.ubuntu.com/2013/validation/account',
+            'unrecognised_scheme')
+        openid_response.addExtension(fetch_response)
+        response = self.complete(openid_response)
+        self.assertRedirects(response, 'http://testserver/getuser/')
+
+        # And they are now logged in as testuser (the passed in
+        # nickname has not caused the username to change).
+        response = self.client.get('/getuser/')
+        self.assertEquals(response.content, 'testuser')
+
+        # The user's full name and email have been updated.
+        user = User.objects.get(username='testuser')
+        self.assertEquals(user.first_name, 'Firstname')
+        self.assertEquals(user.last_name, 'Lastname')
+        self.assertEquals(user.email, 'foo@example.com')
+        # The verified status of their UserOpenID is unchanged
+        user_openid = UserOpenID.objects.get(user=user)
+        self.assertFalse(user_openid.account_verified)
+
     def test_login_teams(self):
         settings.OPENID_LAUNCHPAD_TEAMS_MAPPING_AUTO = False
         settings.OPENID_LAUNCHPAD_TEAMS_MAPPING = {'teamname': 'groupname',

@@ -152,7 +152,8 @@ class OpenIDBackend:
                 first_name = u''
                 last_name = fullname
 
-        verified = verified != 'no'
+        verified = verified in getattr(
+            settings, 'OPENID_VALID_VERIFICATION_SCHEMES', ())
 
         return dict(email=email, nickname=nickname, account_verified=verified,
                     first_name=first_name, last_name=last_name)
