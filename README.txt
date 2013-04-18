@@ -177,3 +177,16 @@ information, by setting the following setting:
 Otherwise, and by default, if the server omits nick information and a user is
 created it'll receive a username 'openiduser' + a number.
 Consider also the OPENID_STRICT_USERNAMES setting (see ``Require a valid nickname``)
+
+== Specify Valid E-mail Verification Schemes ==
+
+When using OpenID Attribute Exchange, the attribute URI
+http://ns.login.ubuntu.com/2013/validation/account is included in the request.
+OpenID Providers that support this extension can reply with a token
+representing what measures they have taken to validate the e-mail address
+included in the response.  To change the list of schemes acceptable for your
+purposes you can change the setting:
+
+        OPENID_VALID_VERIFICATION_SCHEMES = (
+            'token_via_email',
+        )
