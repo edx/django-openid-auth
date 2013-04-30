@@ -250,6 +250,16 @@ class OpenIDBackendTests(TestCase):
 
         self.assertIsNotNone(user)
 
+    def test_authenticate_when_no_teams_required(self):
+        settings.OPENID_LAUNCHPAD_TEAMS_REQUIRED = []
+
+        response = self.make_openid_response(
+            sreg_args=dict(nickname='someuser'),
+            teams_args=dict(is_member='team'))
+        user = self.backend.authenticate(openid_response=response)
+
+        self.assertIsNotNone(user)
+
 
 def suite():
     return unittest.TestLoader().loadTestsFromName(__name__)
