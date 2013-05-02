@@ -77,8 +77,8 @@ class OpenIDBackendTests(TestCase):
         }
         response = self.make_response_sreg(**data)
 
-        data = self.backend._extract_user_details(response)
-        self.assertEqual(data, expected)
+        details = self.backend._extract_user_details(response)
+        self.assertEqual(details, expected)
 
     def make_fake_openid_endpoint(self, claimed_id=None):
         endpoint = OpenIDServiceEndpoint()
