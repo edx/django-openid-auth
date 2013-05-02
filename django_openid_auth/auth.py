@@ -282,7 +282,7 @@ class OpenIDBackend:
 
     def update_user_openid(self, user_openid, details):
         updated = False
-        if details['account_verified'] is not None:
+        if details.get('account_verified', None) is not None:
             user_openid.account_verified = details['account_verified']
             updated = True
         if updated:
