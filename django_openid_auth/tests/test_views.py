@@ -1210,7 +1210,8 @@ class RelyingPartyTests(TestCase):
         self.assertRedirects(response, 'http://testserver/getuser/')
 
         # And they are now logged in as testuser (the passed in
-        # nickname has not caused the username to change).
+        # nickname has not caused the username to change), because
+        # settings.OPENID_FOLLOW_RENAMES is False.
         response = self.client.get('/getuser/')
         self.assertEquals(response.content, 'testuser')
 
@@ -1262,7 +1263,8 @@ class RelyingPartyTests(TestCase):
         self.assertRedirects(response, 'http://testserver/getuser/')
 
         # And they are now logged in as testuser (the passed in
-        # nickname has not caused the username to change).
+        # nickname has not caused the username to change), because
+        # settings.OPENID_FOLLOW_RENAMES is False.
         response = self.client.get('/getuser/')
         self.assertEquals(response.content, 'testuser')
 
