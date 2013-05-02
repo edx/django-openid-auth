@@ -29,10 +29,11 @@
 import unittest
 
 from django.conf import settings
-from django.contrib.auth.models import User
+from django.contrib.auth.models import Group, User
 from django.test import TestCase
 
 from django_openid_auth.auth import OpenIDBackend
+from django_openid_auth.teams import ns_uri as TEAMS_NS
 from openid.consumer.consumer import SuccessResponse
 from openid.consumer.discover import OpenIDServiceEndpoint
 from openid.message import Message, OPENID2_NS
@@ -48,25 +49,58 @@ class OpenIDBackendTests(TestCase):
         self.backend = OpenIDBackend()
         self.old_openid_use_email_for_username = getattr(settings,
             'OPENID_USE_EMAIL_FOR_USERNAME', False)
+        self.old_openid_launchpad_teams_required = getattr(settings,
+            'OPENID_LAUNCHPAD_TEAMS_REQUIRED', [])
+        self.old_openid_launchpad_teams_mapping_auto = getattr(settings,
+            'OPENID_LAUNCHPAD_TEAMS_MAPPING_AUTO', False)
 
     def tearDown(self):
         settings.OPENID_USE_EMAIL_FOR_USERNAME = \
             self.old_openid_use_email_for_username
+        settings.OPENID_LAUNCHPAD_TEAMS_REQUIRED = (
+            self.old_openid_launchpad_teams_required)
+        settings.OPENID_LAUNCHPAD_TEAMS_MAPPING_AUTO = (
+            self.old_openid_launchpad_teams_mapping_auto)
 
     def test_extract_user_details_sreg(self):
+        expected = {
+            'nickname': 'someuser',
+            'first_name': 'Some',
+            'last_name': 'User',
+            'email': 'foo@example.com',
+        }
+        data = {
+            'nickname': expected['nickname'],
+            'fullname': "%s %s" % (expected['first_name'],
+                                   expected['last_name']),
+            'email': expected['email'],
+        }
+        response = self.make_response_sreg(**data)
+
+        details = self.backend._extract_user_details(response)
+        self.assertEqual(details, expected)
+
+    def make_fake_openid_endpoint(self, claimed_id=None):
         endpoint = OpenIDServiceEndpoint()
+        endpoint.claimed_id = claimed_id
+        return endpoint
+
+    def make_openid_response(self, sreg_args=None, teams_args=None):
+        endpoint = self.make_fake_openid_endpoint(claimed_id='some-id')
         message = Message(OPENID2_NS)
-        message.setArg(SREG_NS, "nickname", "someuser")
-        message.setArg(SREG_NS, "fullname", "Some User")
-        message.setArg(SREG_NS, "email", "foo@example.com")
+        if sreg_args is not None:
+            for key, value in sreg_args.items():
+                message.setArg(SREG_NS, key, value)
+        if teams_args is not None:
+            for key, value in teams_args.items():
+                message.setArg(TEAMS_NS, key, value)
         response = SuccessResponse(
             endpoint, message, signed_fields=message.toPostArgs().keys())
+        return response
 
-        data = self.backend._extract_user_details(response)
-        self.assertEqual(data, {"nickname": "someuser",
-                                "first_name": "Some",
-                                "last_name": "User",
-                                "email": "foo@example.com"})
+    def make_response_sreg(self, **kwargs):
+        response = self.make_openid_response(sreg_args=kwargs)
+        return response
 
     def make_response_ax(self, schema="http://axschema.org/",
         fullname="Some User", nickname="someuser", email="foo@example.com",
@@ -179,6 +213,64 @@ class OpenIDBackendTests(TestCase):
             (None, None, 'openiduser')]:
             self.assertEqual(expected,
                 self.backend._get_preferred_username(nick, email))
+
+    def test_authenticate_when_not_member_of_teams_required(self):
+        settings.OPENID_LAUNCHPAD_TEAMS_MAPPING_AUTO = True
+        settings.OPENID_LAUNCHPAD_TEAMS_REQUIRED = ['team']
+        Group.objects.create(name='team')
+
+        response = self.make_openid_response(
+            sreg_args=dict(nickname='someuser'),
+            teams_args=dict(is_member='foo'))
+        user = self.backend.authenticate(openid_response=response)
+
+        self.assertIsNone(user)
+
+    def test_authenticate_when_no_group_mapping_to_required_team(self):
+        settings.OPENID_LAUNCHPAD_TEAMS_MAPPING_AUTO = True
+        settings.OPENID_LAUNCHPAD_TEAMS_REQUIRED = ['team']
+        assert Group.objects.filter(name='team').count() == 0
+
+        response = self.make_openid_response(
+            sreg_args=dict(nickname='someuser'),
+            teams_args=dict(is_member='foo'))
+        user = self.backend.authenticate(openid_response=response)
+
+        self.assertIsNone(user)
+
+    def test_authenticate_when_member_of_teams_required(self):
+        settings.OPENID_LAUNCHPAD_TEAMS_MAPPING_AUTO = True
+        settings.OPENID_LAUNCHPAD_TEAMS_REQUIRED = ['team']
+        Group.objects.create(name='team')
+
+        response = self.make_openid_response(
+            sreg_args=dict(nickname='someuser'),
+            teams_args=dict(is_member='foo,team'))
+        user = self.backend.authenticate(openid_response=response)
+
+        self.assertIsNotNone(user)
+
+    def test_authenticate_when_no_teams_required(self):
+        settings.OPENID_LAUNCHPAD_TEAMS_REQUIRED = []
+
+        response = self.make_openid_response(
+            sreg_args=dict(nickname='someuser'),
+            teams_args=dict(is_member='team'))
+        user = self.backend.authenticate(openid_response=response)
+
+        self.assertIsNotNone(user)
+
+    def test_authenticate_when_member_of_at_least_one_team(self):
+        settings.OPENID_LAUNCHPAD_TEAMS_MAPPING_AUTO = True
+        settings.OPENID_LAUNCHPAD_TEAMS_REQUIRED = ['team1', 'team2']
+        Group.objects.create(name='team1')
+
+        response = self.make_openid_response(
+            sreg_args=dict(nickname='someuser'),
+            teams_args=dict(is_member='foo,team1'))
+        user = self.backend.authenticate(openid_response=response)
+
+        self.assertIsNotNone(user)
 
 
 def suite():

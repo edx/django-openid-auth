@@ -100,6 +100,17 @@ class OpenIDBackend:
             self.update_groups_from_teams(user, teams_response)
             self.update_staff_status_from_teams(user, teams_response)
 
+        teams_required = getattr(settings,
+                                 'OPENID_LAUNCHPAD_TEAMS_REQUIRED', [])
+        if teams_required:
+            teams_mapping = self.get_teams_mapping()
+            groups_required = [group for team, group in teams_mapping.items()
+                               if team in teams_required]
+            matches = set(groups_required).intersection(
+                user.groups.values_list('name', flat=True))
+            if not matches:
+                return None
+
         return user
 
     def _extract_user_details(self, openid_response):
@@ -165,7 +176,7 @@ class OpenIDBackend:
         if getattr(settings, 'OPENID_STRICT_USERNAMES', False):
             if nickname is None or nickname == '':
                 raise MissingUsernameViolation()
-                
+
         # If we don't have a nickname, and we're not being strict, use a default
         nickname = nickname or 'openiduser'
 
@@ -183,12 +194,12 @@ class OpenIDBackend:
                 user__username__startswith=nickname)
             # No exception means we have an existing user for this identity
             # that starts with this nickname.
-            
+
             # If they are an exact match, the user already exists and hasn't
             # changed their username, so continue to use it
             if nickname == user_openid.user.username:
                 return nickname
-            
+
             # It is possible we've had to assign them to nickname+i already.
             oid_username = user_openid.user.username
             if len(oid_username) > len(nickname):
@@ -289,7 +300,7 @@ class OpenIDBackend:
         if updated:
             user.save()
 
-    def update_groups_from_teams(self, user, teams_response):
+    def get_teams_mapping(self):
         teams_mapping_auto = getattr(settings, 'OPENID_LAUNCHPAD_TEAMS_MAPPING_AUTO', False)
         teams_mapping_auto_blacklist = getattr(settings, 'OPENID_LAUNCHPAD_TEAMS_MAPPING_AUTO_BLACKLIST', [])
         teams_mapping = getattr(settings, 'OPENID_LAUNCHPAD_TEAMS_MAPPING', {})
@@ -299,7 +310,10 @@ class OpenIDBackend:
             all_groups = Group.objects.exclude(name__in=teams_mapping_auto_blacklist)
             for group in all_groups:
                 teams_mapping[group.name] = group.name
+        return teams_mapping
 
+    def update_groups_from_teams(self, user, teams_response):
+        teams_mapping = self.get_teams_mapping()
         if len(teams_mapping) == 0:
             return
 
