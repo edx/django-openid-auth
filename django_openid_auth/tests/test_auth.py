@@ -53,6 +53,8 @@ class OpenIDBackendTests(TestCase):
             'OPENID_LAUNCHPAD_TEAMS_REQUIRED', [])
         self.old_openid_launchpad_teams_mapping_auto = getattr(settings,
             'OPENID_LAUNCHPAD_TEAMS_MAPPING_AUTO', False)
+        self.old_openid_email_whitelist_regexp_list = getattr(settings,
+            'OPENID_EMAIL_WHITELIST_REGEXP_LIST', [])
 
     def tearDown(self):
         settings.OPENID_USE_EMAIL_FOR_USERNAME = \
@@ -61,6 +63,8 @@ class OpenIDBackendTests(TestCase):
             self.old_openid_launchpad_teams_required)
         settings.OPENID_LAUNCHPAD_TEAMS_MAPPING_AUTO = (
             self.old_openid_launchpad_teams_mapping_auto)
+        settings.OPENID_EMAIL_WHITELIST_REGEXP_LIST = (
+            self.old_openid_email_whitelist_regexp_list)
 
     def test_extract_user_details_sreg(self):
         expected = {
@@ -268,6 +272,28 @@ class OpenIDBackendTests(TestCase):
         response = self.make_openid_response(
             sreg_args=dict(nickname='someuser'),
             teams_args=dict(is_member='foo,team1'))
+        user = self.backend.authenticate(openid_response=response)
+
+        self.assertIsNotNone(user)
+
+    def test_authenticate_when_not_in_required_team_but_email_whitelisted(self):
+        settings.OPENID_LAUNCHPAD_TEAMS_MAPPING_AUTO = True
+        settings.OPENID_LAUNCHPAD_TEAMS_REQUIRED = ['team']
+        settings.OPENID_EMAIL_WHITELIST_REGEXP_LIST = [
+            'foo(\+[^@]*)?@foo.com',
+        ]
+        assert Group.objects.filter(name='team').count() == 0
+
+        response = self.make_openid_response(
+            sreg_args=dict(nickname='someuser', email='foo@foo.com'),
+            teams_args=dict(is_member='foo'))
+        user = self.backend.authenticate(openid_response=response)
+
+        self.assertIsNotNone(user)
+
+        response = self.make_openid_response(
+            sreg_args=dict(nickname='someuser', email='foo+bar@foo.com'),
+            teams_args=dict(is_member='foo'))
         user = self.backend.authenticate(openid_response=response)
 
         self.assertIsNotNone(user)
