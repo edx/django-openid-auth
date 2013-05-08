@@ -107,7 +107,13 @@ If you use OPENID_LAUNCHPAD_TEAMS_MAPPING_AUTO, the variable OPENID_LAUNCHPAD_TE
 If you want to exclude some groups from the auto mapping, use OPENID_LAUNCHPAD_TEAMS_MAPPING_AUTO_BLACKLIST. This variable has only an effect if OPENID_LAUNCHPAD_TEAMS_MAPPING_AUTO is True.
 
 	OPENID_LAUNCHPAD_TEAMS_MAPPING_AUTO_BLACKLIST = ['django-group1', 'django-group2']
-	
+
+If you want to restrict login to a subset of teams, so that only members of
+those teams can login, you can use the OPENID_LAUNCHPAD_TEAMS_REQUIRED variable
+in your settings.py file.
+
+	OPENID_LAUNCHPAD_TEAMS_REQUIRED = ['launchpad-team-1', 'launchpad-team-2']
+
 == External redirect domains ==
 
 By default, redirecting back to an external URL after auth is forbidden. To permit redirection to external URLs on a separate domain, define ALLOWED_EXTERNAL_OPENID_REDIRECT_DOMAINS in your settings.py file as a list of permitted domains:
