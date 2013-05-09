@@ -48,7 +48,7 @@ from openid.message import IDENTIFIER_SELECT
 from django_openid_auth import teams
 from django_openid_auth.models import UserOpenID
 from django_openid_auth.views import (
-    sanitise_redirect_url, 
+    sanitise_redirect_url,
     make_consumer,
 )
 from django_openid_auth.signals import openid_login_complete
@@ -61,6 +61,7 @@ from django_openid_auth.exceptions import (
 )
 
 ET = importElementTree()
+
 
 class StubOpenIDProvider(HTTPFetcher):
 
@@ -175,22 +176,35 @@ class RelyingPartyTests(TestCase):
         self.server = Server(DjangoOpenIDStore(), op_endpoint=server_url)
         setDefaultFetcher(self.provider, wrap_exceptions=False)
 
-        self.old_login_redirect_url = getattr(settings, 'LOGIN_REDIRECT_URL', '/accounts/profile/')
-        self.old_create_users = getattr(settings, 'OPENID_CREATE_USERS', False)
-        self.old_strict_usernames = getattr(settings, 'OPENID_STRICT_USERNAMES', False)
-        self.old_update_details = getattr(settings, 'OPENID_UPDATE_DETAILS_FROM_SREG', False)
-        self.old_sso_server_url = getattr(settings, 'OPENID_SSO_SERVER_URL', None)
-        self.old_teams_map = getattr(settings, 'OPENID_LAUNCHPAD_TEAMS_MAPPING', {})
-        self.old_use_as_admin_login = getattr(settings, 'OPENID_USE_AS_ADMIN_LOGIN', False)
-        self.old_follow_renames = getattr(settings, 'OPENID_FOLLOW_RENAMES', False)
-        self.old_physical_multifactor = getattr(settings, 'OPENID_PHYSICAL_MULTIFACTOR_REQUIRED', False)
-        self.old_login_render_failure = getattr(settings, 'OPENID_RENDER_FAILURE', None)
-        self.old_consumer_complete = Consumer.complete
-        self.old_openid_use_email_for_username = getattr(settings,
+        self.old_login_redirect_url = getattr(
+            settings, 'LOGIN_REDIRECT_URL', '/accounts/profile/')
+        self.old_create_users = getattr(
+            settings, 'OPENID_CREATE_USERS', False)
+        self.old_strict_usernames = getattr(
+            settings, 'OPENID_STRICT_USERNAMES', False)
+        self.old_update_details = getattr(
+            settings, 'OPENID_UPDATE_DETAILS_FROM_SREG', False)
+        self.old_sso_server_url = getattr(
+            settings, 'OPENID_SSO_SERVER_URL', None)
+        self.old_teams_map = getattr(
+            settings, 'OPENID_LAUNCHPAD_TEAMS_MAPPING', {})
+        self.old_use_as_admin_login = getattr(
+            settings, 'OPENID_USE_AS_ADMIN_LOGIN', False)
+        self.old_follow_renames = getattr(
+            settings, 'OPENID_FOLLOW_RENAMES', False)
+        self.old_physical_multifactor = getattr(
+            settings, 'OPENID_PHYSICAL_MULTIFACTOR_REQUIRED', False)
+        self.old_login_render_failure = getattr(
+            settings, 'OPENID_RENDER_FAILURE', None)
+        self.old_openid_use_email_for_username = getattr(
+            settings,
             'OPENID_USE_EMAIL_FOR_USERNAME', False)
-
         self.old_required_fields = getattr(
             settings, 'OPENID_SREG_REQUIRED_FIELDS', [])
+        self.old_valid_verification_schemes = getattr(
+            settings, 'OPENID_VALID_VERIFICATION_SCHEMES', {})
+
+        self.old_consumer_complete = Consumer.complete
 
         settings.OPENID_CREATE_USERS = False
         settings.OPENID_STRICT_USERNAMES = False
@@ -202,6 +216,7 @@ class RelyingPartyTests(TestCase):
         settings.OPENID_PHYSICAL_MULTIFACTOR_REQUIRED = False
         settings.OPENID_SREG_REQUIRED_FIELDS = []
         settings.OPENID_USE_EMAIL_FOR_USERNAME = False
+        settings.OPENID_VALID_VERIFICATION_SCHEMES = {}
 
     def tearDown(self):
         settings.LOGIN_REDIRECT_URL = self.old_login_redirect_url
@@ -212,11 +227,15 @@ class RelyingPartyTests(TestCase):
         settings.OPENID_LAUNCHPAD_TEAMS_MAPPING = self.old_teams_map
         settings.OPENID_USE_AS_ADMIN_LOGIN = self.old_use_as_admin_login
         settings.OPENID_FOLLOW_RENAMES = self.old_follow_renames
-        settings.OPENID_PHYSICAL_MULTIFACTOR_REQUIRED = self.old_physical_multifactor
+        settings.OPENID_PHYSICAL_MULTIFACTOR_REQUIRED = (
+            self.old_physical_multifactor)
         settings.OPENID_RENDER_FAILURE = self.old_login_render_failure
         Consumer.complete = self.old_consumer_complete
         settings.OPENID_SREG_REQUIRED_FIELDS = self.old_required_fields
-        settings.OPENID_USE_EMAIL_FOR_USERNAME = self.old_openid_use_email_for_username
+        settings.OPENID_USE_EMAIL_FOR_USERNAME = (
+            self.old_openid_use_email_for_username)
+        settings.OPENID_VALID_VERIFICATION_SCHEMES = (
+            self.old_valid_verification_schemes)
 
         setDefaultFetcher(None)
         super(RelyingPartyTests, self).tearDown()
@@ -230,8 +249,9 @@ class RelyingPartyTests(TestCase):
         self.assertEquals(webresponse.code, 302)
         redirect_to = webresponse.headers['location']
         self.assertTrue(redirect_to.startswith(
-                'http://testserver/openid/complete/'))
-        return self.client.get('/openid/complete/',
+            'http://testserver/openid/complete/'))
+        return self.client.get(
+            '/openid/complete/',
             dict(cgi.parse_qsl(redirect_to.split('?', 1)[1])))
 
     def test_login(self):
@@ -1226,13 +1246,36 @@ class RelyingPartyTests(TestCase):
         self.assertEqual(user_openid.account_verified, is_verified)
 
     def test_login_attribute_exchange_with_validation(self):
+        settings.OPENID_VALID_VERIFICATION_SCHEMES = {
+            self.provider.endpoint_url: ('token_via_email',),
+        }
         self._test_login_attribute_exchange('token_via_email', True)
 
     def test_login_attribute_exchange_without_validation(self):
+        settings.OPENID_VALID_VERIFICATION_SCHEMES = {
+            self.provider.endpoint_url: ('token_via_email',),
+        }
         self._test_login_attribute_exchange(None, False)
 
     def test_login_attribute_exchange_unrecognised_validation(self):
+        settings.OPENID_VALID_VERIFICATION_SCHEMES = {
+            self.provider.endpoint_url: ('token_via_email',),
+        }
         self._test_login_attribute_exchange('unrecognised_scheme', False)
+
+    def test_login_attribute_exchange_different_default_validation(self):
+        settings.OPENID_VALID_VERIFICATION_SCHEMES = {
+            None: ('token_via_email', 'sms'),
+            'http://otherprovider/': ('unrecognised_scheme',),
+        }
+        self._test_login_attribute_exchange('unrecognised_scheme', False)
+
+    def test_login_attribute_exchange_matched_default_validation(self):
+        settings.OPENID_VALID_VERIFICATION_SCHEMES = {
+            None: ('token_via_email',),
+            'http://otherprovider/': ('unrecognised_scheme',),
+        }
+        self._test_login_attribute_exchange('token_via_email', True)
 
     def test_login_teams(self):
         settings.OPENID_LAUNCHPAD_TEAMS_MAPPING_AUTO = False

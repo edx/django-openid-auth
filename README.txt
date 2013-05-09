@@ -193,6 +193,12 @@ representing what measures they have taken to validate the e-mail address
 included in the response.  To change the list of schemes acceptable for your
 purposes you can change the setting:
 
-        OPENID_VALID_VERIFICATION_SCHEMES = (
-            'token_via_email',
-        )
+        OPENID_VALID_VERIFICATION_SCHEMES = {
+            None: (),
+            'http://example.com/': ('token_via_email',),
+        }
+
+The element with the None key specifies a list of verification schemes that
+will be accepted as trusted from OpenID Providers that we haven't explicitly
+configured.  These are, almost by definition, untrusted, so it is strongly
+recommended that this list remain empty.

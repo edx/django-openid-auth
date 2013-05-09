@@ -45,6 +45,7 @@ from django_openid_auth.exceptions import (
     RequiredAttributeNotReturned,
 )
 
+
 class OpenIDBackend:
     """A django.contrib.auth backend that authenticates the user based on
     an OpenID response."""
@@ -163,8 +164,12 @@ class OpenIDBackend:
                 first_name = u''
                 last_name = fullname
 
-        verified = verified in getattr(
-            settings, 'OPENID_VALID_VERIFICATION_SCHEMES', ())
+        verification_scheme_map = getattr(
+            settings, 'OPENID_VALID_VERIFICATION_SCHEMES', {})
+        valid_schemes = verification_scheme_map.get(
+            openid_response.endpoint.server_url,
+            verification_scheme_map.get(None, ()))
+        verified = (verified in valid_schemes)
 
         return dict(email=email, nickname=nickname, account_verified=verified,
                     first_name=first_name, last_name=last_name)
@@ -172,8 +177,7 @@ class OpenIDBackend:
     def _get_preferred_username(self, nickname, email):
         if nickname:
             return nickname
-        if email and getattr(settings, 'OPENID_USE_EMAIL_FOR_USERNAME',
-            False):
+        if email and getattr(settings, 'OPENID_USE_EMAIL_FOR_USERNAME', False):
             suggestion = ''.join([x for x in email if x.isalnum()])
             if suggestion:
                 return suggestion
