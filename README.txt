@@ -114,6 +114,21 @@ in your settings.py file.
 
 	OPENID_LAUNCHPAD_TEAMS_REQUIRED = ['launchpad-team-1', 'launchpad-team-2']
 
+Some accounts can be whitelisted from this required team restriction. This is
+specifically useful for doing testing. In order to whitelist an account from
+the required teams restriction you can use the OPENID_EMAIL_WHITELIST_REGEXP_LIST setting.
+
+As an example, the following value
+
+    OPENID_EMAIL_WHITELIST_REGEXP_LIST = ['foo(\+[^@]*)?@foo.com']
+
+would whitelist users with the following emails (and other matching the regular expression)
+from being in a required team:
+
+foo@foo.com
+foo+bar@foo.com
+
+
 == External redirect domains ==
 
 By default, redirecting back to an external URL after auth is forbidden. To permit redirection to external URLs on a separate domain, define ALLOWED_EXTERNAL_OPENID_REDIRECT_DOMAINS in your settings.py file as a list of permitted domains:

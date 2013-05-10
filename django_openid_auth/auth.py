@@ -30,6 +30,8 @@
 
 __metaclass__ = type
 
+import re
+
 from django.conf import settings
 from django.contrib.auth.models import User, Group
 from openid.consumer.consumer import SUCCESS
@@ -113,6 +115,11 @@ class OpenIDBackend:
             matches = set(groups_required).intersection(
                 user.groups.values_list('name', flat=True))
             if not matches:
+                name = 'OPENID_EMAIL_WHITELIST_REGEXP_LIST'
+                whitelist_regexp_list = getattr(settings, name, [])
+                for pattern in whitelist_regexp_list:
+                    if re.match(pattern, user.email):
+                        return user
                 return None
 
         return user
