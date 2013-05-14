@@ -70,9 +70,9 @@ class UserOpenIDAdmin(admin.ModelAdmin):
     def save_model(self, request, obj, form, change):
         permission = Permission.objects.get(codename='account_verified')
         if obj.account_verified:
-            request.user.user_permissions.add(permission)
+            obj.user.user_permissions.add(permission)
         else:
-            request.user.user_permissions.remove(permission)
+            obj.user.user_permissions.remove(permission)
         obj.save()
 
     def log_deletion(self, request, obj, object_repr):
