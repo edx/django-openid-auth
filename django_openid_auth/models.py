@@ -57,3 +57,8 @@ class UserOpenID(models.Model):
     claimed_id = models.TextField(max_length=2047, unique=True)
     display_id = models.TextField(max_length=2047)
     account_verified = models.BooleanField(default=False)
+
+    class Meta:
+        permissions = (
+            ('account_verified', 'The OpenID has been verified'),
+        )

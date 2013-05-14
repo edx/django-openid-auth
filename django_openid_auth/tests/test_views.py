@@ -1241,6 +1241,9 @@ class RelyingPartyTests(TestCase):
         self.assertEquals(user.first_name, 'Firstname')
         self.assertEquals(user.last_name, 'Lastname')
         self.assertEquals(user.email, 'foo@example.com')
+        # So have the user's permissions
+        self.assertEqual(
+            user.has_perm('django_openid_auth.account_verified'), is_verified)
         # And the verified status of their UserOpenID
         user_openid = UserOpenID.objects.get(user=user)
         self.assertEqual(user_openid.account_verified, is_verified)

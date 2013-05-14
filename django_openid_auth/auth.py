@@ -33,7 +33,7 @@ __metaclass__ = type
 import re
 
 from django.conf import settings
-from django.contrib.auth.models import User, Group
+from django.contrib.auth.models import User, Group, Permission
 from openid.consumer.consumer import SUCCESS
 from openid.extensions import ax, sreg, pape
 
@@ -370,3 +370,16 @@ class OpenIDBackend:
 
         user.save()
 
+    def has_perm(self, user_obj, perm, instance=None):
+        return perm in self.get_all_permissions(user_obj, instance)
+
+    def get_all_permissions(self, user_obj, instance=None):
+        try:
+            user_openid = UserOpenID.objects.get(user=user_obj)
+        except UserOpenID.DoesNotExist:
+            return set()
+        if user_openid.account_verified:
+            permission = Permission.objects.get(codename='account_verified')
+            return set(['%s.%s' % (permission.content_type.app_label,
+                                   permission.codename)])
+        return set()
