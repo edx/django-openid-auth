@@ -1164,7 +1164,7 @@ class RelyingPartyTests(TestCase):
         self.assertEqual(['email', 'language'], sreg_request.required)
         self.assertEqual(['fullname', 'nickname'], sreg_request.optional)
 
-    def _test_login_attribute_exchange(self, validation_type, is_verified):
+    def check_login_attribute_exchange(self, validation_type, is_verified):
         settings.OPENID_UPDATE_DETAILS_FROM_SREG = True
         user = User.objects.create_user('testuser', 'someone@example.com')
         useropenid = UserOpenID(
@@ -1252,20 +1252,20 @@ class RelyingPartyTests(TestCase):
         settings.OPENID_VALID_VERIFICATION_SCHEMES = {
             self.provider.endpoint_url: ('token_via_email',),
         }
-        self._test_login_attribute_exchange('token_via_email',
+        self.check_login_attribute_exchange('token_via_email',
                                             is_verified=True)
 
     def test_login_attribute_exchange_without_validation(self):
         settings.OPENID_VALID_VERIFICATION_SCHEMES = {
             self.provider.endpoint_url: ('token_via_email',),
         }
-        self._test_login_attribute_exchange(None, is_verified=False)
+        self.check_login_attribute_exchange(None, is_verified=False)
 
     def test_login_attribute_exchange_unrecognised_validation(self):
         settings.OPENID_VALID_VERIFICATION_SCHEMES = {
             self.provider.endpoint_url: ('token_via_email',),
         }
-        self._test_login_attribute_exchange('unrecognised_scheme',
+        self.check_login_attribute_exchange('unrecognised_scheme',
                                             is_verified=False)
 
     def test_login_attribute_exchange_different_default_validation(self):
@@ -1273,7 +1273,7 @@ class RelyingPartyTests(TestCase):
             None: ('token_via_email', 'sms'),
             'http://otherprovider/': ('unrecognised_scheme',),
         }
-        self._test_login_attribute_exchange('unrecognised_scheme',
+        self.check_login_attribute_exchange('unrecognised_scheme',
                                             is_verified=False)
 
     def test_login_attribute_exchange_matched_default_validation(self):
@@ -1281,7 +1281,7 @@ class RelyingPartyTests(TestCase):
             None: ('token_via_email',),
             'http://otherprovider/': ('unrecognised_scheme',),
         }
-        self._test_login_attribute_exchange('token_via_email',
+        self.check_login_attribute_exchange('token_via_email',
                                             is_verified=True)
 
     def test_login_teams(self):
