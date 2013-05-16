@@ -216,4 +216,10 @@ purposes you can change the setting:
 The element with the None key specifies a list of verification schemes that
 will be accepted as trusted from OpenID Providers that we haven't explicitly
 configured.  These are, almost by definition, untrusted, so it is strongly
-recommended that this list remain empty.
+recommended that this list remain empty.  Verified accounts will be granted the
+django_openid_auth.account_verified permission, which can be checked using
+user.has_perm() and the perms RequestContext attribute in the normal way.
+
+N.B. Users of the South migration framework will need to provide a data
+migration to create the permission when upgrading django-openid-auth, due to a
+known issue in South.  See http://south.aeracode.org/ticket/211 for details.
