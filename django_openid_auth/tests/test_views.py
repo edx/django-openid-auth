@@ -1252,33 +1252,37 @@ class RelyingPartyTests(TestCase):
         settings.OPENID_VALID_VERIFICATION_SCHEMES = {
             self.provider.endpoint_url: ('token_via_email',),
         }
-        self._test_login_attribute_exchange('token_via_email', True)
+        self._test_login_attribute_exchange('token_via_email',
+                                            is_verified=True)
 
     def test_login_attribute_exchange_without_validation(self):
         settings.OPENID_VALID_VERIFICATION_SCHEMES = {
             self.provider.endpoint_url: ('token_via_email',),
         }
-        self._test_login_attribute_exchange(None, False)
+        self._test_login_attribute_exchange(None, is_verified=False)
 
     def test_login_attribute_exchange_unrecognised_validation(self):
         settings.OPENID_VALID_VERIFICATION_SCHEMES = {
             self.provider.endpoint_url: ('token_via_email',),
         }
-        self._test_login_attribute_exchange('unrecognised_scheme', False)
+        self._test_login_attribute_exchange('unrecognised_scheme',
+                                            is_verified=False)
 
     def test_login_attribute_exchange_different_default_validation(self):
         settings.OPENID_VALID_VERIFICATION_SCHEMES = {
             None: ('token_via_email', 'sms'),
             'http://otherprovider/': ('unrecognised_scheme',),
         }
-        self._test_login_attribute_exchange('unrecognised_scheme', False)
+        self._test_login_attribute_exchange('unrecognised_scheme',
+                                            is_verified=False)
 
     def test_login_attribute_exchange_matched_default_validation(self):
         settings.OPENID_VALID_VERIFICATION_SCHEMES = {
             None: ('token_via_email',),
             'http://otherprovider/': ('unrecognised_scheme',),
         }
-        self._test_login_attribute_exchange('token_via_email', True)
+        self._test_login_attribute_exchange('token_via_email',
+                                            is_verified=True)
 
     def test_login_teams(self):
         settings.OPENID_LAUNCHPAD_TEAMS_MAPPING_AUTO = False
