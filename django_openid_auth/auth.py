@@ -316,18 +316,13 @@ class OpenIDBackend:
             user.username = self._get_available_username(details['nickname'], openid_response.identity_url)
             updated = True
         account_verified = details.get('account_verified', None)
-        if account_verified is not None:
-            permission = Permission.objects.get(codename='account_verified')
+        if (account_verified is not None and
+                user_openid.account_verified != account_verified):
             user_openid.account_verified = account_verified
-            if account_verified:
-                user.user_permissions.add(permission)
-            else:
-                user.user_permissions.remove(permission)
-            updated = True
+            user_openid.save()
 
         if updated:
             user.save()
-            user_openid.save()
 
     def get_teams_mapping(self):
         teams_mapping_auto = getattr(settings, 'OPENID_LAUNCHPAD_TEAMS_MAPPING_AUTO', False)

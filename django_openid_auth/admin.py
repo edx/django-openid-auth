@@ -67,14 +67,6 @@ class UserOpenIDAdmin(admin.ModelAdmin):
     list_display = ('user', 'claimed_id')
     search_fields = ('claimed_id',)
 
-    def save_model(self, request, obj, form, change):
-        permission = Permission.objects.get(codename='account_verified')
-        if obj.account_verified:
-            obj.user.user_permissions.add(permission)
-        else:
-            obj.user.user_permissions.remove(permission)
-        obj.save()
-
     def log_deletion(self, request, obj, object_repr):
         permission = Permission.objects.get(codename='account_verified')
         if obj.user:

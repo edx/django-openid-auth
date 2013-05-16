@@ -27,7 +27,10 @@
 # ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-from django.contrib.auth.models import User
+from django.contrib.auth.models import (
+    Permission,
+    User,
+)
 from django.db import models
 
 
@@ -62,3 +65,13 @@ class UserOpenID(models.Model):
         permissions = (
             ('account_verified', 'The OpenID has been verified'),
         )
+
+    def save(self, force_insert=False, force_update=False, using=None):
+        permission = Permission.objects.get(codename='account_verified')
+        perm_label = '%s.%s' % (permission.content_type.app_label,
+                                permission.codename)
+        if self.account_verified and not self.user.has_perm(perm_label):
+            self.user.user_permissions.add(permission)
+        elif not self.account_verified and self.user.has_perm(perm_label):
+            self.user.user_permissions.remove(permission)
+        super(UserOpenID, self).save(force_insert, force_update, using)
