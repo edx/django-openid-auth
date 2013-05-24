@@ -29,7 +29,6 @@
 
 from django.conf import settings
 from django.contrib import admin
-from django.contrib.auth.models import Permission
 from django_openid_auth.models import Nonce, Association, UserOpenID
 from django_openid_auth.store import DjangoOpenIDStore
 
@@ -66,12 +65,6 @@ class UserOpenIDAdmin(admin.ModelAdmin):
     raw_id_fields = ('user',)
     list_display = ('user', 'claimed_id')
     search_fields = ('claimed_id',)
-
-    def log_deletion(self, request, obj, object_repr):
-        permission = Permission.objects.get(codename='account_verified')
-        if obj.user:
-            obj.user.user_permissions.remove(permission)
-        super(UserOpenIDAdmin, self).log_deletion(request, obj, object_repr)
 
 admin.site.register(UserOpenID, UserOpenIDAdmin)
 

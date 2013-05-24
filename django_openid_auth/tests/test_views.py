@@ -32,7 +32,7 @@ import unittest
 from urllib import quote_plus
 
 from django.conf import settings
-from django.contrib.auth.models import User, Group
+from django.contrib.auth.models import User, Group, Permission
 from django.http import HttpRequest, HttpResponse
 from django.test import TestCase
 from openid.consumer.consumer import Consumer, SuccessResponse
@@ -1291,15 +1291,21 @@ class RelyingPartyTests(TestCase):
         user = User.objects.create_user('testuser', 'someone@example.com')
         group = Group(name='groupname')
         group.save()
+        # Django creates the add_nonce permission by default
+        group.permissions.add(
+            Permission.objects.get(codename='add_nonce'))
         ogroup = Group(name='othergroup')
         ogroup.save()
+        # Django creates the add_useropenid permission by default
+        ogroup.permissions.add(
+            Permission.objects.get(codename='add_useropenid'))
         user.groups.add(ogroup)
         user.save()
         useropenid = UserOpenID(
             user=user,
             claimed_id='http://example.com/identity',
             display_id='http://example.com/identity',
-            account_verified=False)
+            account_verified=True)
         useropenid.save()
 
         # Posting in an identity URL begins the authentication request:

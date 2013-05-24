@@ -66,8 +66,11 @@ class UserOpenID(models.Model):
             ('account_verified', 'The OpenID has been verified'),
         )
 
+    def _get_permission(self):
+        return Permission.objects.get(codename='account_verified')
+
     def save(self, force_insert=False, force_update=False, using=None):
-        permission = Permission.objects.get(codename='account_verified')
+        permission = self._get_permission()
         perm_label = '%s.%s' % (permission.content_type.app_label,
                                 permission.codename)
         if self.account_verified and not self.user.has_perm(perm_label):
@@ -75,3 +78,8 @@ class UserOpenID(models.Model):
         elif not self.account_verified and self.user.has_perm(perm_label):
             self.user.user_permissions.remove(permission)
         super(UserOpenID, self).save(force_insert, force_update, using)
+
+    def delete(self, using=None):
+        permission = self._get_permission()
+        self.user.user_permissions.remove(permission)
+        super(UserOpenID, self).delete(using)
