@@ -153,7 +153,7 @@ class DummyDjangoRequest(object):
 
     def build_absolute_uri(self):
         return self.META['SCRIPT_NAME'] + self.request_path
-        
+
     def _combined_request(self):
         request = {}
         request.update(self.POST)
@@ -430,7 +430,7 @@ class RelyingPartyTests(TestCase):
         settings.OPENID_PHYSICAL_MULTIFACTOR_REQUIRED = True
         preferred_auth = pape.AUTH_MULTI_FACTOR_PHYSICAL
         self.provider.type_uris.append(pape.ns_uri)
-        
+
         openid_req = {'openid_identifier': 'http://example.com/identity',
                'next': '/getuser/'}
         response = self.client.post('/openid/login/', openid_req)
@@ -480,7 +480,7 @@ class RelyingPartyTests(TestCase):
 
         query = self.parse_query_string(response.request['QUERY_STRING'])
         self.assertTrue('openid.pape.auth_policies' in query)
-        self.assertEqual(query['openid.pape.auth_policies'], 
+        self.assertEqual(query['openid.pape.auth_policies'],
                 quote_plus(preferred_auth))
 
         response = self.client.get('/getuser/')
@@ -509,7 +509,7 @@ class RelyingPartyTests(TestCase):
         Consumer.complete = mock_complete
 
         user = User.objects.create_user('testuser', 'test@example.com')
-        useropenid = UserOpenID(    
+        useropenid = UserOpenID(
             user=user,
             claimed_id='http://example.com/identity',
             display_id='http://example.com/identity',
@@ -565,7 +565,7 @@ class RelyingPartyTests(TestCase):
         Consumer.complete = mock_complete
 
         user = User.objects.create_user('testuser', 'test@example.com')
-        useropenid = UserOpenID(    
+        useropenid = UserOpenID(
             user=user,
             claimed_id='http://example.com/identity',
             display_id='http://example.com/identity',
@@ -965,7 +965,7 @@ class RelyingPartyTests(TestCase):
            self.assertTrue(isinstance(exception, (RequiredAttributeNotReturned, MissingUsernameViolation)))
            return HttpResponse('Test Failure Override', status=200)
         settings.OPENID_RENDER_FAILURE = mock_login_failure_handler
-        
+
         # Posting in an identity URL begins the authentication request:
         response = self.client.post('/openid/login/',
             {'openid_identifier': 'http://example.com/identity',
@@ -983,7 +983,7 @@ class RelyingPartyTests(TestCase):
                            'email': 'foo@example.com'})
         openid_response.addExtension(sreg_response)
         response = self.complete(openid_response)
-            
+
         # Status code should be 200, since we over-rode the login_failure handler
         self.assertEquals(200, response.status_code)
         self.assertContains(response, 'Test Failure Override')
@@ -1062,7 +1062,7 @@ class RelyingPartyTests(TestCase):
                            'email': 'foo@example.com'})
         openid_response.addExtension(sreg_response)
         response = self.complete(openid_response)
-        
+
         # Status code should be 200, since we over-rode the login_failure handler
         self.assertEquals(200, response.status_code)
         self.assertContains(response, 'Test Failure Override')
@@ -1164,7 +1164,8 @@ class RelyingPartyTests(TestCase):
         self.assertEqual(['email', 'language'], sreg_request.required)
         self.assertEqual(['fullname', 'nickname'], sreg_request.optional)
 
-    def check_login_attribute_exchange(self, validation_type, is_verified):
+    def check_login_attribute_exchange(self, validation_type, is_verified,
+                                       request_account_verified=True):
         settings.OPENID_UPDATE_DETAILS_FROM_SREG = True
         user = User.objects.create_user('testuser', 'someone@example.com')
         useropenid = UserOpenID(
@@ -1208,8 +1209,10 @@ class RelyingPartyTests(TestCase):
         self.assertTrue(fetch_request.has_key(
                 'http://schema.openid.net/namePerson/friendly'))
         # Account verification:
-        self.assertTrue(fetch_request.has_key(
-                'http://ns.login.ubuntu.com/2013/validation/account'))
+        self.assertEqual(
+            fetch_request.has_key(
+                'http://ns.login.ubuntu.com/2013/validation/account'),
+            request_account_verified)
 
         # Build up a response including AX data.
         openid_response = openid_request.answer(True)
@@ -1260,6 +1263,10 @@ class RelyingPartyTests(TestCase):
             self.provider.endpoint_url: ('token_via_email',),
         }
         self.check_login_attribute_exchange(None, is_verified=False)
+
+    def test_login_attribute_exchange_without_account_verified(self):
+        self.check_login_attribute_exchange(None, is_verified=False,
+                                            request_account_verified=False)
 
     def test_login_attribute_exchange_unrecognised_validation(self):
         settings.OPENID_VALID_VERIFICATION_SCHEMES = {
@@ -1449,7 +1456,7 @@ class RelyingPartyTests(TestCase):
         self.assertTrue(self.signal_handler_called)
         openid_login_complete.disconnect(login_callback)
 
-    
+
 class HelperFunctionsTest(TestCase):
     def test_sanitise_redirect_url(self):
         settings.ALLOWED_EXTERNAL_OPENID_REDIRECT_DOMAINS = [
