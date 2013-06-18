@@ -133,6 +133,14 @@ OPENID_CREATE_USERS = True
 # data received via Simple Registration?
 OPENID_UPDATE_DETAILS_FROM_SREG = True
 
+# Map of OpenID Provider base URLs to recognised account verification schemes
+# returned in response to a http://ns.login.ubuntu.com/2013/validation/account
+# request.  Use None as the key in place of a URL to specify verification
+# schemes that will be trusted from unknown OpenID Providers (not recommended).
+OPENID_VALID_VERIFICATION_SCHEMES = {
+    None: (),
+}
+
 # If set, always use this as the identity URL rather than asking the
 # user.  This only makes sense if it is a server URL.
 OPENID_SSO_SERVER_URL = 'https://login.launchpad.net/'

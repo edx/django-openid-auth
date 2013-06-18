@@ -35,7 +35,8 @@ from test_admin import *
 
 def suite():
     suite = unittest.TestSuite()
-    for name in ['test_auth', 'test_store', 'test_views', 'test_admin']:
+    for name in ['test_auth', 'test_models', 'test_store', 'test_views',
+                 'test_admin']:
         mod = __import__('%s.%s' % (__name__, name), {}, {}, ['suite'])
         suite.addTest(mod.suite())
     return suite

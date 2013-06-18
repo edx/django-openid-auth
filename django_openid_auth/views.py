@@ -56,7 +56,6 @@ from django_openid_auth.models import UserOpenID
 from django_openid_auth.signals import openid_login_complete
 from django_openid_auth.store import DjangoOpenIDStore
 from django_openid_auth.exceptions import (
-    RequiredAttributeNotReturned,
     DjangoOpenIDException,
 )
 
@@ -170,7 +169,6 @@ def login_begin(request, template_name='openid/login.html',
                     redirect_field_name: redirect_to
                     }, context_instance=RequestContext(request))
 
-    error = None
     consumer = make_consumer(request)
     try:
         openid_request = consumer.begin(openid_url)
@@ -181,25 +179,40 @@ def login_begin(request, template_name='openid/login.html',
 
     # Request some user details.  If the provider advertises support
     # for attribute exchange, use that.
-    if openid_request.endpoint.supportsType(ax.AXMessage.ns_uri):
+    endpoint = openid_request.endpoint
+    if endpoint.supportsType(ax.AXMessage.ns_uri):
         fetch_request = ax.FetchRequest()
         # We mark all the attributes as required, since Google ignores
         # optional attributes.  We request both the full name and
         # first/last components since some providers offer one but not
         # the other.
         for (attr, alias) in [
-            ('http://axschema.org/contact/email', 'email'),
-            ('http://axschema.org/namePerson', 'fullname'),
-            ('http://axschema.org/namePerson/first', 'firstname'),
-            ('http://axschema.org/namePerson/last', 'lastname'),
-            ('http://axschema.org/namePerson/friendly', 'nickname'),
-            # The myOpenID provider advertises AX support, but uses
-            # attribute names from an obsolete draft of the
-            # specification.  We request them for compatibility.
-            ('http://schema.openid.net/contact/email', 'old_email'),
-            ('http://schema.openid.net/namePerson', 'old_fullname'),
-            ('http://schema.openid.net/namePerson/friendly', 'old_nickname')]:
+                ('http://axschema.org/contact/email', 'email'),
+                ('http://axschema.org/namePerson', 'fullname'),
+                ('http://axschema.org/namePerson/first', 'firstname'),
+                ('http://axschema.org/namePerson/last', 'lastname'),
+                ('http://axschema.org/namePerson/friendly', 'nickname'),
+                # The myOpenID provider advertises AX support, but uses
+                # attribute names from an obsolete draft of the
+                # specification.  We request them for compatibility.
+                ('http://schema.openid.net/contact/email', 'old_email'),
+                ('http://schema.openid.net/namePerson', 'old_fullname'),
+                ('http://schema.openid.net/namePerson/friendly',
+                 'old_nickname')]:
             fetch_request.add(ax.AttrInfo(attr, alias=alias, required=True))
+
+        # conditionally require account_verified attribute
+        verification_scheme_map = getattr(
+            settings, 'OPENID_VALID_VERIFICATION_SCHEMES', {})
+        valid_schemes = verification_scheme_map.get(
+            endpoint.server_url, verification_scheme_map.get(None, ()))
+        if valid_schemes:
+            # there are valid schemes configured for this endpoint, so
+            # request account_verified status
+            fetch_request.add(ax.AttrInfo(
+                'http://ns.login.ubuntu.com/2013/validation/account',
+                alias='account_verified', required=True))
+
         openid_request.addExtension(fetch_request)
     else:
         sreg_required_fields = []
@@ -214,7 +227,7 @@ def login_begin(request, template_name='openid/login.html',
         openid_request.addExtension(
             sreg.SRegRequest(optional=sreg_optional_fields,
                 required=sreg_required_fields))
-            
+
     if getattr(settings, 'OPENID_PHYSICAL_MULTIFACTOR_REQUIRED', False):
         preferred_auth = [
             pape.AUTH_MULTI_FACTOR_PHYSICAL,
@@ -271,7 +284,7 @@ def login_complete(request, redirect_field_name=REDIRECT_FIELD_NAME,
             user = authenticate(openid_response=openid_response)
         except DjangoOpenIDException, e:
             return render_failure(request, e.message, exception=e)
-            
+
         if user is not None:
             if user.is_active:
                 auth_login(request, user)

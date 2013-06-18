@@ -33,7 +33,7 @@ __metaclass__ = type
 import re
 
 from django.conf import settings
-from django.contrib.auth.models import User, Group
+from django.contrib.auth.models import User, Group, Permission
 from openid.consumer.consumer import SUCCESS
 from openid.extensions import ax, sreg, pape
 
@@ -46,6 +46,7 @@ from django_openid_auth.exceptions import (
     MissingPhysicalMultiFactor,
     RequiredAttributeNotReturned,
 )
+
 
 class OpenIDBackend:
     """A django.contrib.auth backend that authenticates the user based on
@@ -79,7 +80,8 @@ class OpenIDBackend:
                 claimed_id__exact=openid_response.identity_url)
         except UserOpenID.DoesNotExist:
             if getattr(settings, 'OPENID_CREATE_USERS', False):
-                user = self.create_user_from_openid(openid_response)
+                user, user_openid = self.create_user_from_openid(
+                    openid_response)
         else:
             user = user_openid.user
 
@@ -88,7 +90,7 @@ class OpenIDBackend:
 
         if getattr(settings, 'OPENID_UPDATE_DETAILS_FROM_SREG', False):
             details = self._extract_user_details(openid_response)
-            self.update_user_details(user, details, openid_response)
+            self.update_user_details(user_openid, details, openid_response)
 
         if getattr(settings, 'OPENID_PHYSICAL_MULTIFACTOR_REQUIRED', False):
             pape_response = pape.Response.fromSuccessResponse(openid_response)
@@ -122,6 +124,7 @@ class OpenIDBackend:
 
     def _extract_user_details(self, openid_response):
         email = fullname = first_name = last_name = nickname = None
+        verified = 'no'
         sreg_response = sreg.SRegResponse.fromSuccessResponse(openid_response)
         if sreg_response:
             email = sreg_response.get('email')
@@ -152,6 +155,8 @@ class OpenIDBackend:
                 'http://axschema.org/namePerson/last', last_name)
             nickname = fetch_response.getSingle(
                 'http://axschema.org/namePerson/friendly', nickname)
+            verified = fetch_response.getSingle(
+                'http://ns.login.ubuntu.com/2013/validation/account', verified)
 
         if fullname and not (first_name or last_name):
             # Django wants to store first and last names separately,
@@ -164,14 +169,20 @@ class OpenIDBackend:
                 first_name = u''
                 last_name = fullname
 
-        return dict(email=email, nickname=nickname,
+        verification_scheme_map = getattr(
+            settings, 'OPENID_VALID_VERIFICATION_SCHEMES', {})
+        valid_schemes = verification_scheme_map.get(
+            openid_response.endpoint.server_url,
+            verification_scheme_map.get(None, ()))
+        verified = (verified in valid_schemes)
+
+        return dict(email=email, nickname=nickname, account_verified=verified,
                     first_name=first_name, last_name=last_name)
 
     def _get_preferred_username(self, nickname, email):
         if nickname:
             return nickname
-        if email and getattr(settings, 'OPENID_USE_EMAIL_FOR_USERNAME',
-            False):
+        if email and getattr(settings, 'OPENID_USE_EMAIL_FOR_USERNAME', False):
             suggestion = ''.join([x for x in email if x.isalnum()])
             if suggestion:
                 return suggestion
@@ -264,10 +275,10 @@ class OpenIDBackend:
             openid_response.identity_url)
 
         user = User.objects.create_user(username, email, password=None)
-        self.associate_openid(user, openid_response)
-        self.update_user_details(user, details, openid_response)
+        user_openid = self.associate_openid(user, openid_response)
+        self.update_user_details(user_openid, details, openid_response)
 
-        return user
+        return user, user_openid
 
     def associate_openid(self, user, openid_response):
         """Associate an OpenID with a user account."""
@@ -289,7 +300,8 @@ class OpenIDBackend:
 
         return user_openid
 
-    def update_user_details(self, user, details, openid_response):
+    def update_user_details(self, user_openid, details, openid_response):
+        user = user_openid.user
         updated = False
         if details['first_name']:
             user.first_name = details['first_name'][:30]
@@ -303,6 +315,11 @@ class OpenIDBackend:
         if getattr(settings, 'OPENID_FOLLOW_RENAMES', False):
             user.username = self._get_available_username(details['nickname'], openid_response.identity_url)
             updated = True
+        account_verified = details.get('account_verified', None)
+        if (account_verified is not None and
+                user_openid.account_verified != account_verified):
+            user_openid.account_verified = account_verified
+            user_openid.save()
 
         if updated:
             user.save()
@@ -348,4 +365,3 @@ class OpenIDBackend:
                 break
 
         user.save()
-

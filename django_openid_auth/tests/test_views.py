@@ -32,7 +32,7 @@ import unittest
 from urllib import quote_plus
 
 from django.conf import settings
-from django.contrib.auth.models import User, Group
+from django.contrib.auth.models import User, Group, Permission
 from django.http import HttpRequest, HttpResponse
 from django.test import TestCase
 from openid.consumer.consumer import Consumer, SuccessResponse
@@ -48,7 +48,7 @@ from openid.message import IDENTIFIER_SELECT
 from django_openid_auth import teams
 from django_openid_auth.models import UserOpenID
 from django_openid_auth.views import (
-    sanitise_redirect_url, 
+    sanitise_redirect_url,
     make_consumer,
 )
 from django_openid_auth.signals import openid_login_complete
@@ -61,6 +61,7 @@ from django_openid_auth.exceptions import (
 )
 
 ET = importElementTree()
+
 
 class StubOpenIDProvider(HTTPFetcher):
 
@@ -152,7 +153,7 @@ class DummyDjangoRequest(object):
 
     def build_absolute_uri(self):
         return self.META['SCRIPT_NAME'] + self.request_path
-        
+
     def _combined_request(self):
         request = {}
         request.update(self.POST)
@@ -175,22 +176,35 @@ class RelyingPartyTests(TestCase):
         self.server = Server(DjangoOpenIDStore(), op_endpoint=server_url)
         setDefaultFetcher(self.provider, wrap_exceptions=False)
 
-        self.old_login_redirect_url = getattr(settings, 'LOGIN_REDIRECT_URL', '/accounts/profile/')
-        self.old_create_users = getattr(settings, 'OPENID_CREATE_USERS', False)
-        self.old_strict_usernames = getattr(settings, 'OPENID_STRICT_USERNAMES', False)
-        self.old_update_details = getattr(settings, 'OPENID_UPDATE_DETAILS_FROM_SREG', False)
-        self.old_sso_server_url = getattr(settings, 'OPENID_SSO_SERVER_URL', None)
-        self.old_teams_map = getattr(settings, 'OPENID_LAUNCHPAD_TEAMS_MAPPING', {})
-        self.old_use_as_admin_login = getattr(settings, 'OPENID_USE_AS_ADMIN_LOGIN', False)
-        self.old_follow_renames = getattr(settings, 'OPENID_FOLLOW_RENAMES', False)
-        self.old_physical_multifactor = getattr(settings, 'OPENID_PHYSICAL_MULTIFACTOR_REQUIRED', False)
-        self.old_login_render_failure = getattr(settings, 'OPENID_RENDER_FAILURE', None)
-        self.old_consumer_complete = Consumer.complete
-        self.old_openid_use_email_for_username = getattr(settings,
+        self.old_login_redirect_url = getattr(
+            settings, 'LOGIN_REDIRECT_URL', '/accounts/profile/')
+        self.old_create_users = getattr(
+            settings, 'OPENID_CREATE_USERS', False)
+        self.old_strict_usernames = getattr(
+            settings, 'OPENID_STRICT_USERNAMES', False)
+        self.old_update_details = getattr(
+            settings, 'OPENID_UPDATE_DETAILS_FROM_SREG', False)
+        self.old_sso_server_url = getattr(
+            settings, 'OPENID_SSO_SERVER_URL', None)
+        self.old_teams_map = getattr(
+            settings, 'OPENID_LAUNCHPAD_TEAMS_MAPPING', {})
+        self.old_use_as_admin_login = getattr(
+            settings, 'OPENID_USE_AS_ADMIN_LOGIN', False)
+        self.old_follow_renames = getattr(
+            settings, 'OPENID_FOLLOW_RENAMES', False)
+        self.old_physical_multifactor = getattr(
+            settings, 'OPENID_PHYSICAL_MULTIFACTOR_REQUIRED', False)
+        self.old_login_render_failure = getattr(
+            settings, 'OPENID_RENDER_FAILURE', None)
+        self.old_openid_use_email_for_username = getattr(
+            settings,
             'OPENID_USE_EMAIL_FOR_USERNAME', False)
-
         self.old_required_fields = getattr(
             settings, 'OPENID_SREG_REQUIRED_FIELDS', [])
+        self.old_valid_verification_schemes = getattr(
+            settings, 'OPENID_VALID_VERIFICATION_SCHEMES', {})
+
+        self.old_consumer_complete = Consumer.complete
 
         settings.OPENID_CREATE_USERS = False
         settings.OPENID_STRICT_USERNAMES = False
@@ -202,6 +216,7 @@ class RelyingPartyTests(TestCase):
         settings.OPENID_PHYSICAL_MULTIFACTOR_REQUIRED = False
         settings.OPENID_SREG_REQUIRED_FIELDS = []
         settings.OPENID_USE_EMAIL_FOR_USERNAME = False
+        settings.OPENID_VALID_VERIFICATION_SCHEMES = {}
 
     def tearDown(self):
         settings.LOGIN_REDIRECT_URL = self.old_login_redirect_url
@@ -212,11 +227,15 @@ class RelyingPartyTests(TestCase):
         settings.OPENID_LAUNCHPAD_TEAMS_MAPPING = self.old_teams_map
         settings.OPENID_USE_AS_ADMIN_LOGIN = self.old_use_as_admin_login
         settings.OPENID_FOLLOW_RENAMES = self.old_follow_renames
-        settings.OPENID_PHYSICAL_MULTIFACTOR_REQUIRED = self.old_physical_multifactor
+        settings.OPENID_PHYSICAL_MULTIFACTOR_REQUIRED = (
+            self.old_physical_multifactor)
         settings.OPENID_RENDER_FAILURE = self.old_login_render_failure
         Consumer.complete = self.old_consumer_complete
         settings.OPENID_SREG_REQUIRED_FIELDS = self.old_required_fields
-        settings.OPENID_USE_EMAIL_FOR_USERNAME = self.old_openid_use_email_for_username
+        settings.OPENID_USE_EMAIL_FOR_USERNAME = (
+            self.old_openid_use_email_for_username)
+        settings.OPENID_VALID_VERIFICATION_SCHEMES = (
+            self.old_valid_verification_schemes)
 
         setDefaultFetcher(None)
         super(RelyingPartyTests, self).tearDown()
@@ -230,8 +249,9 @@ class RelyingPartyTests(TestCase):
         self.assertEquals(webresponse.code, 302)
         redirect_to = webresponse.headers['location']
         self.assertTrue(redirect_to.startswith(
-                'http://testserver/openid/complete/'))
-        return self.client.get('/openid/complete/',
+            'http://testserver/openid/complete/'))
+        return self.client.get(
+            '/openid/complete/',
             dict(cgi.parse_qsl(redirect_to.split('?', 1)[1])))
 
     def test_login(self):
@@ -239,7 +259,8 @@ class RelyingPartyTests(TestCase):
         useropenid = UserOpenID(
             user=user,
             claimed_id='http://example.com/identity',
-            display_id='http://example.com/identity')
+            display_id='http://example.com/identity',
+            account_verified=False)
         useropenid.save()
 
         # The login form is displayed:
@@ -279,7 +300,8 @@ class RelyingPartyTests(TestCase):
         useropenid = UserOpenID(
             user=user,
             claimed_id='http://example.com/identity',
-            display_id='http://example.com/identity')
+            display_id='http://example.com/identity',
+            account_verified=False)
         useropenid.save()
 
         settings.LOGIN_REDIRECT_URL = '/getuser/'
@@ -304,7 +326,8 @@ class RelyingPartyTests(TestCase):
         useropenid = UserOpenID(
             user=user,
             claimed_id='http://example.com/identity',
-            display_id='http://example.com/identity')
+            display_id='http://example.com/identity',
+            account_verified=False)
         useropenid.save()
 
         # Requesting the login form immediately begins an
@@ -361,9 +384,11 @@ class RelyingPartyTests(TestCase):
         self.assertEquals(user.last_name, 'User')
         self.assertEquals(user.email, 'foo@example.com')
 
-    def _do_user_login(self, req_data, resp_data, use_sreg=True, use_pape=None):
+    def _do_user_login(self, req_data, resp_data, use_sreg=True,
+                       use_pape=None):
         openid_request = self._get_login_request(req_data)
-        openid_response = self._get_login_response(openid_request, resp_data, use_sreg, use_pape)
+        openid_response = self._get_login_response(
+            openid_request, resp_data, use_sreg, use_pape)
         response = self.complete(openid_response)
         self.assertRedirects(response, 'http://testserver/getuser/')
         return response
@@ -378,7 +403,8 @@ class RelyingPartyTests(TestCase):
         openid_request = self.provider.parseFormPost(response.content)
         return openid_request
 
-    def _get_login_response(self, openid_request, resp_data, use_sreg, use_pape):
+    def _get_login_response(self, openid_request, resp_data, use_sreg,
+                            use_pape):
         openid_response = openid_request.answer(True)
 
         if use_sreg:
@@ -404,7 +430,7 @@ class RelyingPartyTests(TestCase):
         settings.OPENID_PHYSICAL_MULTIFACTOR_REQUIRED = True
         preferred_auth = pape.AUTH_MULTI_FACTOR_PHYSICAL
         self.provider.type_uris.append(pape.ns_uri)
-        
+
         openid_req = {'openid_identifier': 'http://example.com/identity',
                'next': '/getuser/'}
         response = self.client.post('/openid/login/', openid_req)
@@ -441,7 +467,8 @@ class RelyingPartyTests(TestCase):
         useropenid = UserOpenID(
             user=user,
             claimed_id='http://example.com/identity',
-            display_id='http://example.com/identity')
+            display_id='http://example.com/identity',
+            account_verified=False)
         useropenid.save()
 
         openid_req = {'openid_identifier': 'http://example.com/identity',
@@ -453,7 +480,7 @@ class RelyingPartyTests(TestCase):
 
         query = self.parse_query_string(response.request['QUERY_STRING'])
         self.assertTrue('openid.pape.auth_policies' in query)
-        self.assertEqual(query['openid.pape.auth_policies'], 
+        self.assertEqual(query['openid.pape.auth_policies'],
                 quote_plus(preferred_auth))
 
         response = self.client.get('/getuser/')
@@ -482,10 +509,11 @@ class RelyingPartyTests(TestCase):
         Consumer.complete = mock_complete
 
         user = User.objects.create_user('testuser', 'test@example.com')
-        useropenid = UserOpenID(    
+        useropenid = UserOpenID(
             user=user,
             claimed_id='http://example.com/identity',
-            display_id='http://example.com/identity')
+            display_id='http://example.com/identity',
+            account_verified=False)
         useropenid.save()
 
         openid_req = {'openid_identifier': 'http://example.com/identity',
@@ -537,10 +565,11 @@ class RelyingPartyTests(TestCase):
         Consumer.complete = mock_complete
 
         user = User.objects.create_user('testuser', 'test@example.com')
-        useropenid = UserOpenID(    
+        useropenid = UserOpenID(
             user=user,
             claimed_id='http://example.com/identity',
-            display_id='http://example.com/identity')
+            display_id='http://example.com/identity',
+            account_verified=False)
         useropenid.save()
 
         openid_req = {'openid_identifier': 'http://example.com/identity',
@@ -694,7 +723,8 @@ class RelyingPartyTests(TestCase):
         useropenid = UserOpenID(
             user=user,
             claimed_id='http://example.com/identity',
-            display_id='http://example.com/identity')
+            display_id='http://example.com/identity',
+            account_verified=False)
         useropenid.save()
 
         openid_req = {'openid_identifier': 'http://example.com/identity',
@@ -722,7 +752,8 @@ class RelyingPartyTests(TestCase):
         useropenid = UserOpenID(
             user=user,
             claimed_id='http://example.com/identity',
-            display_id='http://example.com/identity')
+            display_id='http://example.com/identity',
+            account_verified=False)
         useropenid.save()
 
         openid_req = {'openid_identifier': 'http://example.com/identity',
@@ -749,14 +780,16 @@ class RelyingPartyTests(TestCase):
         UserOpenID.objects.get_or_create(
             user=user,
             claimed_id='http://example.com/existing_identity',
-            display_id='http://example.com/existing_identity')
+            display_id='http://example.com/existing_identity',
+            account_verified=False)
 
         # Setup user who is going to try to change username to 'testuser'
         renamed_user = User.objects.create_user('renameuser', 'someone@example.com')
         UserOpenID.objects.get_or_create(
             user=renamed_user,
             claimed_id='http://example.com/identity',
-            display_id='http://example.com/identity')
+            display_id='http://example.com/identity',
+            account_verified=False)
 
         # identity url is for 'renameuser'
         openid_req = {'openid_identifier': 'http://example.com/identity',
@@ -786,14 +819,16 @@ class RelyingPartyTests(TestCase):
         UserOpenID.objects.get_or_create(
             user=user,
             claimed_id='http://example.com/existing_identity',
-            display_id='http://example.com/existing_identity')
+            display_id='http://example.com/existing_identity',
+            account_verified=False)
 
         # Setup user who is going to try to change username to 'testuser'
         renamed_user = User.objects.create_user('testuser2000eight', 'someone@example.com')
         UserOpenID.objects.get_or_create(
             user=renamed_user,
             claimed_id='http://example.com/identity',
-            display_id='http://example.com/identity')
+            display_id='http://example.com/identity',
+            account_verified=False)
 
         # identity url is for 'testuser2000eight'
         openid_req = {'openid_identifier': 'http://example.com/identity',
@@ -826,14 +861,16 @@ class RelyingPartyTests(TestCase):
         UserOpenID.objects.get_or_create(
             user=user,
             claimed_id='http://example.com/existing_identity',
-            display_id='http://example.com/existing_identity')
+            display_id='http://example.com/existing_identity',
+            account_verified=False)
 
         # Setup user who is going to try to change username to 'testuser'
         renamed_user = User.objects.create_user('testuser2000', 'someone@example.com')
         UserOpenID.objects.get_or_create(
             user=renamed_user,
             claimed_id='http://example.com/identity',
-            display_id='http://example.com/identity')
+            display_id='http://example.com/identity',
+            account_verified=False)
 
         # identity url is for 'testuser2000'
         openid_req = {'openid_identifier': 'http://example.com/identity',
@@ -864,7 +901,8 @@ class RelyingPartyTests(TestCase):
         UserOpenID.objects.get_or_create(
             user=user,
             claimed_id='http://example.com/identity',
-            display_id='http://example.com/identity')
+            display_id='http://example.com/identity',
+            account_verified=False)
 
         # identity url is for 'testuser2'
         openid_req = {'openid_identifier': 'http://example.com/identity',
@@ -927,7 +965,7 @@ class RelyingPartyTests(TestCase):
            self.assertTrue(isinstance(exception, (RequiredAttributeNotReturned, MissingUsernameViolation)))
            return HttpResponse('Test Failure Override', status=200)
         settings.OPENID_RENDER_FAILURE = mock_login_failure_handler
-        
+
         # Posting in an identity URL begins the authentication request:
         response = self.client.post('/openid/login/',
             {'openid_identifier': 'http://example.com/identity',
@@ -945,7 +983,7 @@ class RelyingPartyTests(TestCase):
                            'email': 'foo@example.com'})
         openid_response.addExtension(sreg_response)
         response = self.complete(openid_response)
-            
+
         # Status code should be 200, since we over-rode the login_failure handler
         self.assertEquals(200, response.status_code)
         self.assertContains(response, 'Test Failure Override')
@@ -958,7 +996,8 @@ class RelyingPartyTests(TestCase):
         useropenid = UserOpenID(
             user=user,
             claimed_id='http://example.com/different_identity',
-            display_id='http://example.com/different_identity')
+            display_id='http://example.com/different_identity',
+            account_verified=False)
         useropenid.save()
 
         # Posting in an identity URL begins the authentication request:
@@ -1003,7 +1042,8 @@ class RelyingPartyTests(TestCase):
         useropenid = UserOpenID(
             user=user,
             claimed_id='http://example.com/different_identity',
-            display_id='http://example.com/different_identity')
+            display_id='http://example.com/different_identity',
+            account_verified=False)
         useropenid.save()
 
         # Posting in an identity URL begins the authentication request:
@@ -1022,7 +1062,7 @@ class RelyingPartyTests(TestCase):
                            'email': 'foo@example.com'})
         openid_response.addExtension(sreg_response)
         response = self.complete(openid_response)
-        
+
         # Status code should be 200, since we over-rode the login_failure handler
         self.assertEquals(200, response.status_code)
         self.assertContains(response, 'Test Failure Override')
@@ -1062,7 +1102,8 @@ class RelyingPartyTests(TestCase):
         useropenid = UserOpenID(
             user=user,
             claimed_id='http://example.com/identity',
-            display_id='http://example.com/identity')
+            display_id='http://example.com/identity',
+            account_verified=False)
         useropenid.save()
 
         openid_req = {'openid_identifier': 'http://example.com/identity',
@@ -1087,7 +1128,8 @@ class RelyingPartyTests(TestCase):
         useropenid = UserOpenID(
             user=user,
             claimed_id='http://example.com/identity',
-            display_id='http://example.com/identity')
+            display_id='http://example.com/identity',
+            account_verified=False)
         useropenid.save()
 
         # Posting in an identity URL begins the authentication request:
@@ -1107,7 +1149,8 @@ class RelyingPartyTests(TestCase):
         useropenid = UserOpenID(
             user=user,
             claimed_id='http://example.com/identity',
-            display_id='http://example.com/identity')
+            display_id='http://example.com/identity',
+            account_verified=False)
         useropenid.save()
 
         # Posting in an identity URL begins the authentication request:
@@ -1121,7 +1164,8 @@ class RelyingPartyTests(TestCase):
         self.assertEqual(['email', 'language'], sreg_request.required)
         self.assertEqual(['fullname', 'nickname'], sreg_request.optional)
 
-    def test_login_attribute_exchange(self):
+    def check_login_attribute_exchange(self, validation_type, is_verified,
+                                       request_account_verified=True):
         settings.OPENID_UPDATE_DETAILS_FROM_SREG = True
         user = User.objects.create_user('testuser', 'someone@example.com')
         useropenid = UserOpenID(
@@ -1163,6 +1207,11 @@ class RelyingPartyTests(TestCase):
                 'http://schema.openid.net/namePerson'))
         self.assertTrue(fetch_request.has_key(
                 'http://schema.openid.net/namePerson/friendly'))
+        # Account verification:
+        self.assertEqual(
+            fetch_request.has_key(
+                'http://ns.login.ubuntu.com/2013/validation/account'),
+            request_account_verified)
 
         # Build up a response including AX data.
         openid_response = openid_request.answer(True)
@@ -1175,12 +1224,17 @@ class RelyingPartyTests(TestCase):
             'http://axschema.org/namePerson/last', 'Lastname')
         fetch_response.addValue(
             'http://axschema.org/namePerson/friendly', 'someuser')
+        if validation_type is not None:
+            fetch_response.addValue(
+                'http://ns.login.ubuntu.com/2013/validation/account',
+                validation_type)
         openid_response.addExtension(fetch_response)
         response = self.complete(openid_response)
         self.assertRedirects(response, 'http://testserver/getuser/')
 
         # And they are now logged in as testuser (the passed in
-        # nickname has not caused the username to change).
+        # nickname has not caused the username to change), because
+        # settings.OPENID_FOLLOW_RENAMES is False.
         response = self.client.get('/getuser/')
         self.assertEquals(response.content, 'testuser')
 
@@ -1189,6 +1243,56 @@ class RelyingPartyTests(TestCase):
         self.assertEquals(user.first_name, 'Firstname')
         self.assertEquals(user.last_name, 'Lastname')
         self.assertEquals(user.email, 'foo@example.com')
+        # So have the user's permissions
+        self.assertEqual(
+            user.has_perm('django_openid_auth.account_verified'), is_verified)
+        # And the verified status of their UserOpenID
+        user_openid = UserOpenID.objects.get(user=user)
+        self.assertEqual(user_openid.account_verified, is_verified)
+
+    def test_login_attribute_exchange_with_verification(self):
+        settings.OPENID_VALID_VERIFICATION_SCHEMES = {
+            self.provider.endpoint_url: ('token_via_email',),
+        }
+        self.check_login_attribute_exchange('token_via_email',
+                                            is_verified=True)
+
+    def test_login_attribute_exchange_without_verification(self):
+        settings.OPENID_VALID_VERIFICATION_SCHEMES = {
+            self.provider.endpoint_url: ('token_via_email',),
+        }
+        self.check_login_attribute_exchange(None, is_verified=False)
+
+    def test_login_attribute_exchange_without_account_verified(self):
+        # don't request account_verified attribute in AX request (as there are
+        # no valid verificatation schemes defined)
+        # and check account verification status is left unmodified
+        # (it's set to False by default for a new user)
+        self.check_login_attribute_exchange(None, is_verified=False,
+                                            request_account_verified=False)
+
+    def test_login_attribute_exchange_unrecognised_verification(self):
+        settings.OPENID_VALID_VERIFICATION_SCHEMES = {
+            self.provider.endpoint_url: ('token_via_email',),
+        }
+        self.check_login_attribute_exchange('unrecognised_scheme',
+                                            is_verified=False)
+
+    def test_login_attribute_exchange_different_default_verification(self):
+        settings.OPENID_VALID_VERIFICATION_SCHEMES = {
+            None: ('token_via_email', 'sms'),
+            'http://otherprovider/': ('unrecognised_scheme',),
+        }
+        self.check_login_attribute_exchange('unrecognised_scheme',
+                                            is_verified=False)
+
+    def test_login_attribute_exchange_matched_default_verification(self):
+        settings.OPENID_VALID_VERIFICATION_SCHEMES = {
+            None: ('token_via_email',),
+            'http://otherprovider/': ('unrecognised_scheme',),
+        }
+        self.check_login_attribute_exchange('token_via_email',
+                                            is_verified=True)
 
     def test_login_teams(self):
         settings.OPENID_LAUNCHPAD_TEAMS_MAPPING_AUTO = False
@@ -1197,14 +1301,21 @@ class RelyingPartyTests(TestCase):
         user = User.objects.create_user('testuser', 'someone@example.com')
         group = Group(name='groupname')
         group.save()
+        # Django creates the add_nonce permission by default
+        group.permissions.add(
+            Permission.objects.get(codename='add_nonce'))
         ogroup = Group(name='othergroup')
         ogroup.save()
+        # Django creates the add_useropenid permission by default
+        ogroup.permissions.add(
+            Permission.objects.get(codename='add_useropenid'))
         user.groups.add(ogroup)
         user.save()
         useropenid = UserOpenID(
             user=user,
             claimed_id='http://example.com/identity',
-            display_id='http://example.com/identity')
+            display_id='http://example.com/identity',
+            account_verified=True)
         useropenid.save()
 
         # Posting in an identity URL begins the authentication request:
@@ -1248,7 +1359,8 @@ class RelyingPartyTests(TestCase):
         useropenid = UserOpenID(
             user=user,
             claimed_id='http://example.com/identity',
-            display_id='http://example.com/identity')
+            display_id='http://example.com/identity',
+            account_verified=False)
         useropenid.save()
 
         # Posting in an identity URL begins the authentication request:
@@ -1300,7 +1412,8 @@ class RelyingPartyTests(TestCase):
         useropenid = UserOpenID(
             user=user,
             claimed_id='http://example.com/identity',
-            display_id='http://example.com/identity')
+            display_id='http://example.com/identity',
+            account_verified=False)
         useropenid.save()
 
         # Posting in an identity URL begins the authentication request:
@@ -1324,7 +1437,8 @@ class RelyingPartyTests(TestCase):
         useropenid = UserOpenID(
             user=user,
             claimed_id='http://example.com/identity',
-            display_id='http://example.com/identity')
+            display_id='http://example.com/identity',
+            account_verified=False)
         useropenid.save()
         response = self.client.post('/openid/login/',
             {'openid_identifier': 'http://example.com/identity'})
@@ -1345,7 +1459,7 @@ class RelyingPartyTests(TestCase):
         self.assertTrue(self.signal_handler_called)
         openid_login_complete.disconnect(login_callback)
 
-    
+
 class HelperFunctionsTest(TestCase):
     def test_sanitise_redirect_url(self):
         settings.ALLOWED_EXTERNAL_OPENID_REDIRECT_DOMAINS = [
