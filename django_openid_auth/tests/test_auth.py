@@ -217,8 +217,12 @@ class OpenIDBackendTests(TestCase):
             email=u"someotheruser@example.com", account_verified=expected)
         self.backend.update_user_details(user_openid, data, response)
 
+        # refresh object from the database
+        user_openid = UserOpenID.objects.get(pk=user_openid.pk)
         # check the verification status
         self.assertEqual(user_openid.account_verified, expected)
+        self.assertEqual(user_openid.user.has_perm(
+            'django_openid_auth.account_verified'), expected)
 
     def test_update_user_openid_unverified(self):
         user_openid = self.make_user_openid()
