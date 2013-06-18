@@ -1171,8 +1171,7 @@ class RelyingPartyTests(TestCase):
         useropenid = UserOpenID(
             user=user,
             claimed_id='http://example.com/identity',
-            display_id='http://example.com/identity',
-            account_verified=False)
+            display_id='http://example.com/identity')
         useropenid.save()
 
         # Configure the provider to advertise attribute exchange
@@ -1251,31 +1250,34 @@ class RelyingPartyTests(TestCase):
         user_openid = UserOpenID.objects.get(user=user)
         self.assertEqual(user_openid.account_verified, is_verified)
 
-    def test_login_attribute_exchange_with_validation(self):
+    def test_login_attribute_exchange_with_verification(self):
         settings.OPENID_VALID_VERIFICATION_SCHEMES = {
             self.provider.endpoint_url: ('token_via_email',),
         }
         self.check_login_attribute_exchange('token_via_email',
                                             is_verified=True)
 
-    def test_login_attribute_exchange_without_validation(self):
+    def test_login_attribute_exchange_without_verification(self):
         settings.OPENID_VALID_VERIFICATION_SCHEMES = {
             self.provider.endpoint_url: ('token_via_email',),
         }
         self.check_login_attribute_exchange(None, is_verified=False)
 
     def test_login_attribute_exchange_without_account_verified(self):
+        # don't request account_verified attribute in AX request
+        # and check account verification status is left unmodified
+        # (it's set to False by default for a new user)
         self.check_login_attribute_exchange(None, is_verified=False,
                                             request_account_verified=False)
 
-    def test_login_attribute_exchange_unrecognised_validation(self):
+    def test_login_attribute_exchange_unrecognised_verification(self):
         settings.OPENID_VALID_VERIFICATION_SCHEMES = {
             self.provider.endpoint_url: ('token_via_email',),
         }
         self.check_login_attribute_exchange('unrecognised_scheme',
                                             is_verified=False)
 
-    def test_login_attribute_exchange_different_default_validation(self):
+    def test_login_attribute_exchange_different_default_verification(self):
         settings.OPENID_VALID_VERIFICATION_SCHEMES = {
             None: ('token_via_email', 'sms'),
             'http://otherprovider/': ('unrecognised_scheme',),
@@ -1283,7 +1285,7 @@ class RelyingPartyTests(TestCase):
         self.check_login_attribute_exchange('unrecognised_scheme',
                                             is_verified=False)
 
-    def test_login_attribute_exchange_matched_default_validation(self):
+    def test_login_attribute_exchange_matched_default_verification(self):
         settings.OPENID_VALID_VERIFICATION_SCHEMES = {
             None: ('token_via_email',),
             'http://otherprovider/': ('unrecognised_scheme',),
