@@ -1264,7 +1264,8 @@ class RelyingPartyTests(TestCase):
         self.check_login_attribute_exchange(None, is_verified=False)
 
     def test_login_attribute_exchange_without_account_verified(self):
-        # don't request account_verified attribute in AX request
+        # don't request account_verified attribute in AX request (as there are
+        # no valid verificatation schemes defined)
         # and check account verification status is left unmodified
         # (it's set to False by default for a new user)
         self.check_login_attribute_exchange(None, is_verified=False,
