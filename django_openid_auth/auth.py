@@ -80,8 +80,7 @@ class OpenIDBackend:
                 claimed_id__exact=openid_response.identity_url)
         except UserOpenID.DoesNotExist:
             if getattr(settings, 'OPENID_CREATE_USERS', False):
-                user, user_openid = self.create_user_from_openid(
-                    openid_response)
+                user = self.create_user_from_openid(openid_response)
         else:
             user = user_openid.user
 
@@ -90,7 +89,7 @@ class OpenIDBackend:
 
         if getattr(settings, 'OPENID_UPDATE_DETAILS_FROM_SREG', False):
             details = self._extract_user_details(openid_response)
-            self.update_user_details(user_openid, details, openid_response)
+            self.update_user_details(user, details, openid_response)
 
         if getattr(settings, 'OPENID_PHYSICAL_MULTIFACTOR_REQUIRED', False):
             pape_response = pape.Response.fromSuccessResponse(openid_response)
@@ -275,10 +274,10 @@ class OpenIDBackend:
             openid_response.identity_url)
 
         user = User.objects.create_user(username, email, password=None)
-        user_openid = self.associate_openid(user, openid_response)
-        self.update_user_details(user_openid, details, openid_response)
+        self.associate_openid(user, openid_response)
+        self.update_user_details(user, details, openid_response)
 
-        return user, user_openid
+        return user
 
     def associate_openid(self, user, openid_response):
         """Associate an OpenID with a user account."""
@@ -300,8 +299,7 @@ class OpenIDBackend:
 
         return user_openid
 
-    def update_user_details(self, user_openid, details, openid_response):
-        user = user_openid.user
+    def update_user_details(self, user, details, openid_response):
         updated = False
         if details['first_name']:
             user.first_name = details['first_name'][:30]
@@ -313,13 +311,18 @@ class OpenIDBackend:
             user.email = details['email']
             updated = True
         if getattr(settings, 'OPENID_FOLLOW_RENAMES', False):
-            user.username = self._get_available_username(details['nickname'], openid_response.identity_url)
+            user.username = self._get_available_username(
+                details['nickname'], openid_response.identity_url)
             updated = True
         account_verified = details.get('account_verified', None)
-        if (account_verified is not None and
-                user_openid.account_verified != account_verified):
-            user_openid.account_verified = account_verified
-            user_openid.save()
+        if (account_verified is not None):
+            permission = UserOpenID.permission()
+            perm_label = '%s.%s' % (permission.content_type.app_label,
+                                    permission.codename)
+            if account_verified and not user.has_perm(perm_label):
+                user.user_permissions.add(permission)
+            elif not account_verified and user.has_perm(perm_label):
+                user.user_permissions.remove(permission)
 
         if updated:
             user.save()
