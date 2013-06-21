@@ -65,11 +65,7 @@ class UserOpenID(models.Model):
             ('account_verified', 'The OpenID has been verified'),
         )
 
-    @classmethod
-    def permission(self):
-        return Permission.objects.get(codename='account_verified')
-
     def delete(self, using=None):
-        permission = UserOpenID.permission()
+        permission = Permission.objects.get(codename='account_verified')
         self.user.user_permissions.remove(permission)
         super(UserOpenID, self).delete(using)

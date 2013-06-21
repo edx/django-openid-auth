@@ -29,7 +29,11 @@
 import unittest
 
 from django.conf import settings
-from django.contrib.auth.models import Group, User
+from django.contrib.auth.models import (
+    Group,
+    Permission,
+    User,
+)
 from django.test import TestCase
 
 from django_openid_auth.auth import OpenIDBackend
@@ -207,7 +211,7 @@ class OpenIDBackendTests(TestCase):
 
     def _test_account_verified(self, user, initially_verified, expected):
         # set user's verification status
-        permission = UserOpenID.permission()
+        permission = Permission.objects.get(codename='account_verified')
         if initially_verified:
             user.user_permissions.add(permission)
         else:

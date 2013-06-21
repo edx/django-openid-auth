@@ -31,7 +31,10 @@ import unittest
 from django.contrib.auth.models import User
 from django.test import TestCase
 
-from django_openid_auth.models import UserOpenID
+from django_openid_auth.models import (
+    Permission,
+    UserOpenID,
+)
 
 
 class UserOpenIDModelTestCase(TestCase):
@@ -60,7 +63,7 @@ class UserOpenIDModelTestCase(TestCase):
             user=user,
             claimed_id='http://example.com/existing_identity',
             display_id='http://example.com/existing_identity')
-        permission = UserOpenID.permission()
+        permission = Permission.objects.get(codename='account_verified')
         user.user_permissions.add(permission)
         self.assertTrue(
             User.objects.get(username='someuser').has_perm(

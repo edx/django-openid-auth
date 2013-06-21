@@ -316,7 +316,7 @@ class OpenIDBackend:
             updated = True
         account_verified = details.get('account_verified', None)
         if (account_verified is not None):
-            permission = UserOpenID.permission()
+            permission = Permission.objects.get(codename='account_verified')
             perm_label = '%s.%s' % (permission.content_type.app_label,
                                     permission.codename)
             if account_verified and not user.has_perm(perm_label):
