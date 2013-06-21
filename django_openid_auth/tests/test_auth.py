@@ -192,37 +192,49 @@ class OpenIDBackendTests(TestCase):
         self.assertEqual("Some56789012345678901234567890",  user.first_name)
         self.assertEqual("User56789012345678901234567890",  user.last_name)
 
-    def test_update_user_openid_unverified(self):
-        response = self.make_response_ax()
-        user = User.objects.create_user('someuser', 'someuser@example.com',
-            password=None)
+    def make_user(self, username='someuser', email='someuser@example.com',
+                password=None):
+        user = User.objects.create_user(username, email, password=password)
+        return user
+
+    def make_user_openid(self, user=None,
+                         claimed_id='http://example.com/existing_identity',
+                         display_id='http://example.com/existing_identity'):
+        if user is None:
+            user = self.make_user()
         user_openid, created = UserOpenID.objects.get_or_create(
-            user=user,
-            claimed_id='http://example.com/existing_identity',
-            display_id='http://example.com/existing_identity',
-            account_verified=False)
+            user=user, claimed_id=claimed_id, display_id=display_id)
+        return user_openid
+
+    def _test_account_verified(self, user_openid, verified, expected):
+        # set user's verification status
+        user_openid.account_verified = verified
+
+        # get a response including verification status
+        response = self.make_response_ax()
         data = dict(first_name=u"Some56789012345678901234567890123",
             last_name=u"User56789012345678901234567890123",
-            email=u"someotheruser@example.com", account_verified=False)
-
+            email=u"someotheruser@example.com", account_verified=expected)
         self.backend.update_user_details(user_openid, data, response)
-        self.assertFalse(user_openid.account_verified)
+
+        # refresh object from the database
+        user_openid = UserOpenID.objects.get(pk=user_openid.pk)
+        # check the verification status
+        self.assertEqual(user_openid.account_verified, expected)
+        self.assertEqual(user_openid.user.has_perm(
+            'django_openid_auth.account_verified'), expected)
+
+    def test_update_user_openid_unverified(self):
+        user_openid = self.make_user_openid()
+
+        for verified in (False, True):
+            self._test_account_verified(user_openid, verified, expected=False)
 
     def test_update_user_openid_verified(self):
-        response = self.make_response_ax()
-        user = User.objects.create_user('someuser', 'someuser@example.com',
-            password=None)
-        user_openid, created = UserOpenID.objects.get_or_create(
-            user=user,
-            claimed_id='http://example.com/existing_identity',
-            display_id='http://example.com/existing_identity',
-            account_verified=False)
-        data = dict(first_name=u"Some56789012345678901234567890123",
-            last_name=u"User56789012345678901234567890123",
-            email=u"someotheruser@example.com", account_verified=True)
+        user_openid = self.make_user_openid()
 
-        self.backend.update_user_details(user_openid, data, response)
-        self.assertTrue(user_openid.account_verified)
+        for verified in (False, True):
+            self._test_account_verified(user_openid, verified, expected=True)
 
     def test_extract_user_details_name_with_trailing_space(self):
         response = self.make_response_ax(fullname="SomeUser ")
