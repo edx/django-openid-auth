@@ -31,7 +31,10 @@ import unittest
 from django.contrib.auth.models import User
 from django.test import TestCase
 
-from django_openid_auth.models import UserOpenID
+from django_openid_auth.models import (
+    Permission,
+    UserOpenID,
+)
 
 
 class UserOpenIDModelTestCase(TestCase):
@@ -42,35 +45,14 @@ class UserOpenIDModelTestCase(TestCase):
         user_openid, created = UserOpenID.objects.get_or_create(
             user=user,
             claimed_id='http://example.com/existing_identity',
-            display_id='http://example.com/existing_identity',
-            account_verified=False)
+            display_id='http://example.com/existing_identity')
 
         self.assertEqual('someuser', user_openid.user.username)
         self.assertEqual(
             user_openid.claimed_id, 'http://example.com/existing_identity')
         self.assertEqual(
             user_openid.display_id, 'http://example.com/existing_identity')
-        self.assertFalse(user_openid.account_verified)
         self.assertFalse(
-            User.objects.get(username='someuser').has_perm(
-                'django_openid_auth.account_verified'))
-
-    def test_create_verified_useropenid(self):
-        user = User.objects.create_user('someuser', 'someuser@example.com',
-                                        password=None)
-        user_openid, created = UserOpenID.objects.get_or_create(
-            user=user,
-            claimed_id='http://example.com/existing_identity',
-            display_id='http://example.com/existing_identity',
-            account_verified=True)
-
-        self.assertEqual('someuser', user_openid.user.username)
-        self.assertEqual(
-            user_openid.claimed_id, 'http://example.com/existing_identity')
-        self.assertEqual(
-            user_openid.display_id, 'http://example.com/existing_identity')
-        self.assertTrue(user_openid.account_verified)
-        self.assertTrue(
             User.objects.get(username='someuser').has_perm(
                 'django_openid_auth.account_verified'))
 
@@ -80,9 +62,9 @@ class UserOpenIDModelTestCase(TestCase):
         user_openid, created = UserOpenID.objects.get_or_create(
             user=user,
             claimed_id='http://example.com/existing_identity',
-            display_id='http://example.com/existing_identity',
-            account_verified=True)
-
+            display_id='http://example.com/existing_identity')
+        permission = Permission.objects.get(codename='account_verified')
+        user.user_permissions.add(permission)
         self.assertTrue(
             User.objects.get(username='someuser').has_perm(
                 'django_openid_auth.account_verified'))

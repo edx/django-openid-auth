@@ -259,8 +259,7 @@ class RelyingPartyTests(TestCase):
         useropenid = UserOpenID(
             user=user,
             claimed_id='http://example.com/identity',
-            display_id='http://example.com/identity',
-            account_verified=False)
+            display_id='http://example.com/identity')
         useropenid.save()
 
         # The login form is displayed:
@@ -300,8 +299,7 @@ class RelyingPartyTests(TestCase):
         useropenid = UserOpenID(
             user=user,
             claimed_id='http://example.com/identity',
-            display_id='http://example.com/identity',
-            account_verified=False)
+            display_id='http://example.com/identity')
         useropenid.save()
 
         settings.LOGIN_REDIRECT_URL = '/getuser/'
@@ -326,8 +324,7 @@ class RelyingPartyTests(TestCase):
         useropenid = UserOpenID(
             user=user,
             claimed_id='http://example.com/identity',
-            display_id='http://example.com/identity',
-            account_verified=False)
+            display_id='http://example.com/identity')
         useropenid.save()
 
         # Requesting the login form immediately begins an
@@ -467,8 +464,7 @@ class RelyingPartyTests(TestCase):
         useropenid = UserOpenID(
             user=user,
             claimed_id='http://example.com/identity',
-            display_id='http://example.com/identity',
-            account_verified=False)
+            display_id='http://example.com/identity')
         useropenid.save()
 
         openid_req = {'openid_identifier': 'http://example.com/identity',
@@ -512,8 +508,7 @@ class RelyingPartyTests(TestCase):
         useropenid = UserOpenID(
             user=user,
             claimed_id='http://example.com/identity',
-            display_id='http://example.com/identity',
-            account_verified=False)
+            display_id='http://example.com/identity')
         useropenid.save()
 
         openid_req = {'openid_identifier': 'http://example.com/identity',
@@ -568,8 +563,7 @@ class RelyingPartyTests(TestCase):
         useropenid = UserOpenID(
             user=user,
             claimed_id='http://example.com/identity',
-            display_id='http://example.com/identity',
-            account_verified=False)
+            display_id='http://example.com/identity')
         useropenid.save()
 
         openid_req = {'openid_identifier': 'http://example.com/identity',
@@ -723,8 +717,7 @@ class RelyingPartyTests(TestCase):
         useropenid = UserOpenID(
             user=user,
             claimed_id='http://example.com/identity',
-            display_id='http://example.com/identity',
-            account_verified=False)
+            display_id='http://example.com/identity')
         useropenid.save()
 
         openid_req = {'openid_identifier': 'http://example.com/identity',
@@ -752,8 +745,7 @@ class RelyingPartyTests(TestCase):
         useropenid = UserOpenID(
             user=user,
             claimed_id='http://example.com/identity',
-            display_id='http://example.com/identity',
-            account_verified=False)
+            display_id='http://example.com/identity')
         useropenid.save()
 
         openid_req = {'openid_identifier': 'http://example.com/identity',
@@ -780,16 +772,14 @@ class RelyingPartyTests(TestCase):
         UserOpenID.objects.get_or_create(
             user=user,
             claimed_id='http://example.com/existing_identity',
-            display_id='http://example.com/existing_identity',
-            account_verified=False)
+            display_id='http://example.com/existing_identity')
 
         # Setup user who is going to try to change username to 'testuser'
         renamed_user = User.objects.create_user('renameuser', 'someone@example.com')
         UserOpenID.objects.get_or_create(
             user=renamed_user,
             claimed_id='http://example.com/identity',
-            display_id='http://example.com/identity',
-            account_verified=False)
+            display_id='http://example.com/identity')
 
         # identity url is for 'renameuser'
         openid_req = {'openid_identifier': 'http://example.com/identity',
@@ -819,16 +809,14 @@ class RelyingPartyTests(TestCase):
         UserOpenID.objects.get_or_create(
             user=user,
             claimed_id='http://example.com/existing_identity',
-            display_id='http://example.com/existing_identity',
-            account_verified=False)
+            display_id='http://example.com/existing_identity')
 
         # Setup user who is going to try to change username to 'testuser'
         renamed_user = User.objects.create_user('testuser2000eight', 'someone@example.com')
         UserOpenID.objects.get_or_create(
             user=renamed_user,
             claimed_id='http://example.com/identity',
-            display_id='http://example.com/identity',
-            account_verified=False)
+            display_id='http://example.com/identity')
 
         # identity url is for 'testuser2000eight'
         openid_req = {'openid_identifier': 'http://example.com/identity',
@@ -861,16 +849,14 @@ class RelyingPartyTests(TestCase):
         UserOpenID.objects.get_or_create(
             user=user,
             claimed_id='http://example.com/existing_identity',
-            display_id='http://example.com/existing_identity',
-            account_verified=False)
+            display_id='http://example.com/existing_identity')
 
         # Setup user who is going to try to change username to 'testuser'
         renamed_user = User.objects.create_user('testuser2000', 'someone@example.com')
         UserOpenID.objects.get_or_create(
             user=renamed_user,
             claimed_id='http://example.com/identity',
-            display_id='http://example.com/identity',
-            account_verified=False)
+            display_id='http://example.com/identity')
 
         # identity url is for 'testuser2000'
         openid_req = {'openid_identifier': 'http://example.com/identity',
@@ -901,8 +887,7 @@ class RelyingPartyTests(TestCase):
         UserOpenID.objects.get_or_create(
             user=user,
             claimed_id='http://example.com/identity',
-            display_id='http://example.com/identity',
-            account_verified=False)
+            display_id='http://example.com/identity')
 
         # identity url is for 'testuser2'
         openid_req = {'openid_identifier': 'http://example.com/identity',
@@ -996,8 +981,7 @@ class RelyingPartyTests(TestCase):
         useropenid = UserOpenID(
             user=user,
             claimed_id='http://example.com/different_identity',
-            display_id='http://example.com/different_identity',
-            account_verified=False)
+            display_id='http://example.com/different_identity')
         useropenid.save()
 
         # Posting in an identity URL begins the authentication request:
@@ -1042,8 +1026,7 @@ class RelyingPartyTests(TestCase):
         useropenid = UserOpenID(
             user=user,
             claimed_id='http://example.com/different_identity',
-            display_id='http://example.com/different_identity',
-            account_verified=False)
+            display_id='http://example.com/different_identity')
         useropenid.save()
 
         # Posting in an identity URL begins the authentication request:
@@ -1102,8 +1085,7 @@ class RelyingPartyTests(TestCase):
         useropenid = UserOpenID(
             user=user,
             claimed_id='http://example.com/identity',
-            display_id='http://example.com/identity',
-            account_verified=False)
+            display_id='http://example.com/identity')
         useropenid.save()
 
         openid_req = {'openid_identifier': 'http://example.com/identity',
@@ -1128,8 +1110,7 @@ class RelyingPartyTests(TestCase):
         useropenid = UserOpenID(
             user=user,
             claimed_id='http://example.com/identity',
-            display_id='http://example.com/identity',
-            account_verified=False)
+            display_id='http://example.com/identity')
         useropenid.save()
 
         # Posting in an identity URL begins the authentication request:
@@ -1149,8 +1130,7 @@ class RelyingPartyTests(TestCase):
         useropenid = UserOpenID(
             user=user,
             claimed_id='http://example.com/identity',
-            display_id='http://example.com/identity',
-            account_verified=False)
+            display_id='http://example.com/identity')
         useropenid.save()
 
         # Posting in an identity URL begins the authentication request:
@@ -1246,9 +1226,6 @@ class RelyingPartyTests(TestCase):
         # So have the user's permissions
         self.assertEqual(
             user.has_perm('django_openid_auth.account_verified'), is_verified)
-        # And the verified status of their UserOpenID
-        user_openid = UserOpenID.objects.get(user=user)
-        self.assertEqual(user_openid.account_verified, is_verified)
 
     def test_login_attribute_exchange_with_verification(self):
         settings.OPENID_VALID_VERIFICATION_SCHEMES = {
@@ -1314,8 +1291,7 @@ class RelyingPartyTests(TestCase):
         useropenid = UserOpenID(
             user=user,
             claimed_id='http://example.com/identity',
-            display_id='http://example.com/identity',
-            account_verified=True)
+            display_id='http://example.com/identity')
         useropenid.save()
 
         # Posting in an identity URL begins the authentication request:
@@ -1359,8 +1335,7 @@ class RelyingPartyTests(TestCase):
         useropenid = UserOpenID(
             user=user,
             claimed_id='http://example.com/identity',
-            display_id='http://example.com/identity',
-            account_verified=False)
+            display_id='http://example.com/identity')
         useropenid.save()
 
         # Posting in an identity URL begins the authentication request:
@@ -1412,8 +1387,7 @@ class RelyingPartyTests(TestCase):
         useropenid = UserOpenID(
             user=user,
             claimed_id='http://example.com/identity',
-            display_id='http://example.com/identity',
-            account_verified=False)
+            display_id='http://example.com/identity')
         useropenid.save()
 
         # Posting in an identity URL begins the authentication request:
@@ -1437,8 +1411,7 @@ class RelyingPartyTests(TestCase):
         useropenid = UserOpenID(
             user=user,
             claimed_id='http://example.com/identity',
-            display_id='http://example.com/identity',
-            account_verified=False)
+            display_id='http://example.com/identity')
         useropenid.save()
         response = self.client.post('/openid/login/',
             {'openid_identifier': 'http://example.com/identity'})
