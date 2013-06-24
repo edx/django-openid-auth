@@ -1,11 +1,12 @@
 {% load i18n %}
+{% load url from future %}
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
 <html>
 <head>
 <title>Sign in with your OpenID</title>
 <style type="text/css">
 input.openid {
-    background: url({% url openid-logo %}) no-repeat;
+    background: url({% url 'openid-logo' %}) no-repeat;
     background-position: 0 50%;
     padding-left: 16px;
 }
