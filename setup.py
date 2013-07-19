@@ -76,5 +76,5 @@ setup(
         'django_openid_auth': ['templates/openid/*.html'],
         },
     provides=['django_openid_auth'],
-    requires=['django (>=1.1.2)', 'openid (>=2.2.0)'],
+    requires=['django (>=1.1.2)', 'openid (>=2.2.0)', 'south'],
     )
