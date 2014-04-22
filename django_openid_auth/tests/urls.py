@@ -27,7 +27,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 from django.http import HttpResponse
-from django.conf.urls.defaults import *
+from django.conf.urls import *
 
 
 def get_user(request):
