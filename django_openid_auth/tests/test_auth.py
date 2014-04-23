@@ -39,6 +39,7 @@ from django.test import TestCase
 from django_openid_auth.auth import OpenIDBackend
 from django_openid_auth.models import UserOpenID
 from django_openid_auth.teams import ns_uri as TEAMS_NS
+from django_openid_auth.tests.helpers import override_session_serializer
 from openid.consumer.consumer import SuccessResponse
 from openid.consumer.discover import OpenIDServiceEndpoint
 from openid.message import Message, OPENID2_NS
@@ -47,6 +48,8 @@ from openid.message import Message, OPENID2_NS
 SREG_NS = "http://openid.net/sreg/1.0"
 AX_NS = "http://openid.net/srv/ax/1.0"
 
+
+@override_session_serializer
 class OpenIDBackendTests(TestCase):
 
     def setUp(self):

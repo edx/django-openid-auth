@@ -8,12 +8,17 @@ single signon systems.
 
 == Basic Installation ==
 
- 1. Install the Jan Rain Python OpenID library.  It can be found at:
+ 0. Install the Jan Rain Python OpenID library.  It can be found at:
 
         http://openidenabled.com/python-openid/
 
     It can also be found in most Linux distributions packaged as
     "python-openid".  You will need version 2.2.0 or later.
+
+ 1. If you are using Django 1.6, configure your project to use the
+    pickle based session serializer:
+
+        SESSION_SERIALIZER = 'django.contrib.sessions.serializers.PickleSerializer'
 
  2. Add 'django_openid_auth' to INSTALLED_APPS for your application.
     At a minimum, you'll need the following in there:
@@ -143,8 +148,8 @@ If you require openid authentication into the admin application, add the followi
 
         OPENID_USE_AS_ADMIN_LOGIN = True
 
-It is worth noting that a user needs to be be marked as a "staff user" to be able to access the admin interface.  A new openid user will not normally be a "staff user".  
-The easiest way to resolve this is to use traditional authentication (OPENID_USE_AS_ADMIN_LOGIN = False) to sign in as your first user with a password and authorise your 
+It is worth noting that a user needs to be be marked as a "staff user" to be able to access the admin interface.  A new openid user will not normally be a "staff user".
+The easiest way to resolve this is to use traditional authentication (OPENID_USE_AS_ADMIN_LOGIN = False) to sign in as your first user with a password and authorise your
 openid user to be staff.
 
 == Change Django usernames if the nickname changes on the provider ==
@@ -162,7 +167,7 @@ If the user has already been renamed to nickname+1 due to a conflict, and the ni
 If you must have a valid, unique nickname in order to create a user accont, add the following setting:
 
         OPENID_STRICT_USERNAMES = True
-        
+
 This will cause an OpenID login attempt to fail if the provider does not return a 'nickname' (username) for the user, or if the nickname conflicts with an existing user with a different openid identiy url.
 Without this setting, logins without a nickname will be given the username 'openiduser', and upon conflicts with existing username, an incrementing number will be appended to the username until it is unique.
 
@@ -171,7 +176,7 @@ Without this setting, logins without a nickname will be given the username 'open
 If your users should use a physical multi-factor authentication method, such as RSA tokens or YubiKey, add the following setting:
 
         OPENID_PHYSICAL_MULTIFACTOR_REQUIRED = True
-        
+
 If the user's OpenID provider supports the PAPE extension and provides the Physical Multifactor authentication policy, this will
 cause the OpenID login to fail if the user does not provide valid physical authentication to the provider.
 
