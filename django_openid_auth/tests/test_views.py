@@ -47,6 +47,7 @@ from openid.message import IDENTIFIER_SELECT
 
 from django_openid_auth import teams
 from django_openid_auth.models import UserOpenID
+from django_openid_auth.tests.helpers import override_session_serializer
 from django_openid_auth.views import (
     sanitise_redirect_url,
     make_consumer,
@@ -161,6 +162,8 @@ class DummyDjangoRequest(object):
         return request
     REQUEST = property(_combined_request)
 
+
+@override_session_serializer
 class RelyingPartyTests(TestCase):
     urls = 'django_openid_auth.tests.urls'
 
@@ -1354,7 +1357,7 @@ class RelyingPartyTests(TestCase):
         self.assertTrue(group3 not in user.groups.all())
 
     def test_login_teams_staff_not_defined(self):
-        delattr(settings, 'OPENID_LAUNCHPAD_STAFF_TEAMS')
+        assert getattr(settings, 'OPENID_LAUNCHPAD_STAFF_TEAMS', None) is None
         user = User.objects.create_user('testuser', 'someone@example.com')
         user.is_staff = True
         user.save()
@@ -1433,6 +1436,7 @@ class RelyingPartyTests(TestCase):
         openid_login_complete.disconnect(login_callback)
 
 
+@override_session_serializer
 class HelperFunctionsTest(TestCase):
     def test_sanitise_redirect_url(self):
         settings.ALLOWED_EXTERNAL_OPENID_REDIRECT_DOMAINS = [
