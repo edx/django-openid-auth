@@ -1357,6 +1357,7 @@ class RelyingPartyTests(TestCase):
         self.assertTrue(group3 not in user.groups.all())
 
     def test_login_teams_staff_not_defined(self):
+        assert getattr(settings, 'OPENID_LAUNCHPAD_STAFF_TEAMS', None) is None
         user = User.objects.create_user('testuser', 'someone@example.com')
         user.is_staff = True
         user.save()
