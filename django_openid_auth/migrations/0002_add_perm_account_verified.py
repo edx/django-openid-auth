@@ -11,11 +11,9 @@ class Migration(DataMigration):
         ct, created = orm['contenttypes.ContentType'].objects.get_or_create(
             model='useropenid', app_label='django_openid_auth',
             defaults=dict(name='user open id'))
-        print '\n\n===created', created
         perm, created = orm['auth.permission'].objects.get_or_create(
             content_type=ct, codename='account_verified',
             defaults=dict(name=u'The OpenID account has been verified'))
-        print '\n\n===created', created
 
     def backwards(self, orm):
         "Write your backwards methods here."
