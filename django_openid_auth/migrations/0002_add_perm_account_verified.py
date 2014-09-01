@@ -2,19 +2,25 @@
 from south.utils import datetime_utils as datetime
 from south.db import db
 from south.v2 import DataMigration
-from django.db import models, transaction
+from django.db import connection, models, transaction
 
 class Migration(DataMigration):
 
+    def add_account_verified_permission(self, orm):
+        ct, _ = orm['contenttypes.ContentType'].objects.get_or_create(
+            model='useropenid', app_label='django_openid_auth',
+            defaults=dict(name='user open id'))
+        perm, _ = orm['auth.permission'].objects.get_or_create(
+            content_type=ct, codename='account_verified',
+            defaults=dict(name=u'The OpenID account has been verified'))
+
     def forwards(self, orm):
         "Write your forwards methods here."
-        with transaction.autocommit():
-            ct, _ = orm['contenttypes.ContentType'].objects.get_or_create(
-                model='useropenid', app_label='django_openid_auth',
-                defaults=dict(name='user open id'))
-            perm, _ = orm['auth.permission'].objects.get_or_create(
-                content_type=ct, codename='account_verified',
-                defaults=dict(name=u'The OpenID account has been verified'))
+        if connection._savepoint_allowed():
+            self.add_account_verified_permission(orm)
+        else:
+            with transaction.autocommit():
+                self.add_account_verified_permission(orm)
 
     def backwards(self, orm):
         "Write your backwards methods here."

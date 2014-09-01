@@ -42,11 +42,11 @@ MANAGERS = ADMINS
 if django_version >= "1.2":
     csrf_middleware = 'django.middleware.csrf.CsrfViewMiddleware'
     DATABASES = {
-                     'default': {
-                         'ENGINE': 'django.db.backends.sqlite3',
-                         'NAME': 'sqlite.db'
-                     }
-                 }
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': 'sqlite.db',
+        }
+    }
     TEMPLATE_LOADERS = (
         'django.template.loaders.filesystem.Loader',
         'django.template.loaders.app_directories.Loader',
