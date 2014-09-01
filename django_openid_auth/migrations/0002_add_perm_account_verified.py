@@ -16,11 +16,13 @@ class Migration(DataMigration):
 
     def forwards(self, orm):
         "Write your forwards methods here."
-        if connection._savepoint_allowed():
-            self.add_account_verified_permission(orm)
-        else:
+        if getattr(connection.features,
+                   'autocommits_when_autocommit_is_off', False):
+            # lilely sqlite3 with django 1.6 and above
             with transaction.autocommit():
                 self.add_account_verified_permission(orm)
+        else:
+            self.add_account_verified_permission(orm)
 
     def backwards(self, orm):
         "Write your backwards methods here."
