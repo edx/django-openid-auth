@@ -18,7 +18,7 @@ class Migration(DataMigration):
         "Write your forwards methods here."
         if getattr(connection.features,
                    'autocommits_when_autocommit_is_off', False):
-            # lilely sqlite3 with django 1.6 and above
+            # likely sqlite3 with django 1.6 and above
             with transaction.autocommit():
                 self.add_account_verified_permission(orm)
         else:
