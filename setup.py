@@ -58,7 +58,6 @@ setup(
     package_data={
         'django_openid_auth': ['templates/openid/*.html'],
     },
-    provides=['django_openid_auth'],
 
     # metadata for upload to PyPI
     author='Canonical Ltd',
