@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # django-openid-auth -  OpenID integration for django.contrib.auth
 #
-# Copyright (C) 2009-2013 Canonical Ltd.
+# Copyright (C) 2009-2015 Canonical Ltd.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -39,15 +39,28 @@ library also includes the following features:
     info.
 """
 
-from distutils.core import setup
+from setuptools import find_packages, setup
 
 
 description, long_description = __doc__.split('\n\n', 1)
-VERSION = '0.5'
+VERSION = '0.5.1'
 
 setup(
     name='django-openid-auth',
     version=VERSION,
+
+    packages=find_packages(),
+    install_requires=[
+        'django>=1.4',
+        'openid>=2.2.0',
+        'south',
+    ],
+    package_data={
+        'django_openid_auth': ['templates/openid/*.html'],
+    },
+    provides=['django_openid_auth'],
+
+    # metadata for upload to PyPI
     author='Canonical Ltd',
     author_email='noreply@canonical.com',
     description=description,
@@ -58,7 +71,7 @@ setup(
     download_url=('http://launchpad.net/django-openid-auth/trunk/%s/+download'
                   '/django-openid-auth-%s.tar.gz' % (VERSION, VERSION)),
     classifiers=[
-        'Development Status :: 4 - Beta',
+        'Development Status :: 5 - Production/Stable',
         'Environment :: Web Environment',
         'Framework :: Django',
         'Intended Audience :: Developers',
@@ -67,15 +80,4 @@ setup(
         'Programming Language :: Python',
         'Topic :: Software Development :: Libraries :: Python Modules'
         ],
-    packages=[
-        'django_openid_auth',
-        'django_openid_auth.management',
-        'django_openid_auth.management.commands',
-        'django_openid_auth.tests',
-        ],
-    package_data={
-        'django_openid_auth': ['templates/openid/*.html'],
-        },
-    provides=['django_openid_auth'],
-    requires=['django (>=1.4)', 'openid (>=2.2.0)', 'south'],
-    )
+)
