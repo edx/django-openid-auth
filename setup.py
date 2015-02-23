@@ -52,7 +52,7 @@ setup(
     packages=find_packages(),
     install_requires=[
         'django>=1.4',
-        'openid>=2.2.0',
+        'python-openid>=2.2.0',
         'south',
     ],
     package_data={
