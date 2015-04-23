@@ -27,11 +27,10 @@
 # ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-from django.contrib.auth.models import (
-    Permission,
-    User,
-)
+from __future__ import unicode_literals
+
 from django.db import models
+from django.contrib.auth.models import Permission, User
 
 
 class Nonce(models.Model):

@@ -64,6 +64,8 @@ will be provided:
 @since: 2.1.1
 """
 
+from __future__ import unicode_literals
+
 from openid import oidutil
 from openid.extension import Extension
 from openid.message import (

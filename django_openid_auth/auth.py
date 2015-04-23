@@ -28,6 +28,8 @@
 
 """Glue between OpenID and django.contrib.auth."""
 
+from __future__ import unicode_literals
+
 __metaclass__ = type
 
 import re
@@ -166,7 +168,7 @@ class OpenIDBackend:
             if len(split_names) == 2:
                 first_name, last_name = split_names
             else:
-                first_name = u''
+                first_name = ''
                 last_name = fullname
 
         verification_scheme_map = getattr(
@@ -195,7 +197,8 @@ class OpenIDBackend:
             if nickname is None or nickname == '':
                 raise MissingUsernameViolation()
 
-        # If we don't have a nickname, and we're not being strict, use default
+        # If we don't have a nickname, and we're not being strict, use a
+        # default
         nickname = nickname or 'openiduser'
 
         # See if we already have this nickname assigned to a username

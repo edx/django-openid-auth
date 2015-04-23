@@ -27,6 +27,8 @@
 # ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+from __future__ import unicode_literals
+
 import cgi
 
 from urlparse import parse_qs
@@ -258,7 +260,7 @@ class RelyingPartyTests(TestCase):
         response = self.client.post(
             self.login_url,
             {'openid_identifier': 'http://example.com/identity',
-             'next': u'/files/ñandú.jpg'.encode('utf-8')})
+             'next': '/files/ñandú.jpg'.encode('utf-8')})
         self.assertContains(response, 'OpenID transaction in progress')
 
     def test_login_no_next(self):

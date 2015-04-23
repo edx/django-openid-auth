@@ -27,11 +27,15 @@
 # ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+from __future__ import unicode_literals
+
 from urllib import urlencode
 from urlparse import parse_qsl, urlparse
 
 from django.conf import settings
 from django.contrib import admin
+from django.http import HttpResponseRedirect
+from django_openid_auth import views
 from django_openid_auth.models import Nonce, Association, UserOpenID
 from django_openid_auth.store import DjangoOpenIDStore
 
@@ -76,10 +80,6 @@ admin.site.register(UserOpenID, UserOpenIDAdmin)
 original_admin_login = None
 if original_admin_login is None:
     original_admin_login = admin.sites.AdminSite.login
-
-
-from django.http import HttpResponseRedirect
-from django_openid_auth import views
 
 
 def _openid_login(instance, request, error_message='', extra_context=None):

@@ -28,6 +28,8 @@
 
 """Tests for the django_openid_auth Admin login form replacement."""
 
+from __future__ import unicode_literals
+
 from django.conf import settings
 from django.contrib.auth.models import User
 
@@ -48,7 +50,7 @@ class SiteAdminTests(TestCase):
         staff member, then they get a failure response.
         """
         User.objects.create_user(
-            username=u'testing', email='testing@example.com', password=u'test')
+            username='testing', email='testing@example.com', password='test')
         assert self.client.login(username='testing', password='test')
         response = self.client.get('/admin/', follow=True)
         self.assertContains(

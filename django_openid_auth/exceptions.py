@@ -28,6 +28,8 @@
 
 """Exception classes thrown by OpenID Authentication and Validation."""
 
+from __future__ import unicode_literals
+
 
 class DjangoOpenIDException(Exception):
     pass
