@@ -141,4 +141,4 @@ LOGIN_URL = '/openid/login/'
 LOGIN_REDIRECT_URL = '/'
 
 # Should django_auth_openid be used to sign into the admin interface?
-OPENID_USE_AS_ADMIN_LOGIN = True
+OPENID_USE_AS_ADMIN_LOGIN = False
