@@ -62,6 +62,7 @@ from django_openid_auth.exceptions import (
 
 next_url_re = re.compile('^/[-\w/]+$')
 
+
 def is_valid_next_url(next):
     # When we allow this:
     #   /openid/?next=/welcome/
@@ -78,8 +79,8 @@ def sanitise_redirect_url(redirect_to):
         is_valid = False
     elif '//' in redirect_to:
         # Allow the redirect URL to be external if it's a permitted domain
-        allowed_domains = getattr(settings,
-            "ALLOWED_EXTERNAL_OPENID_REDIRECT_DOMAINS", [])
+        allowed_domains = getattr(
+            settings, "ALLOWED_EXTERNAL_OPENID_REDIRECT_DOMAINS", [])
         s, netloc, p, q, f = urlsplit(redirect_to)
         # allow it if netloc is blank or if the domain is allowed
         if netloc:
@@ -113,11 +114,13 @@ def render_openid_request(request, openid_request, return_to, trust_root=None):
     if openid_request.shouldSendRedirect():
         redirect_url = openid_request.redirectURL(
             trust_root, return_to)
-        return HttpResponseRedirect(redirect_url)
+        response = HttpResponseRedirect(redirect_url)
     else:
         form_html = openid_request.htmlMarkup(
             trust_root, return_to, form_tag_attrs={'id': 'openid_message'})
-        return HttpResponse(form_html, content_type='text/html;charset=UTF-8')
+        response = HttpResponse(
+            form_html, content_type='text/html;charset=UTF-8')
+    return response
 
 
 def default_render_failure(request, message, status=403,
@@ -133,7 +136,7 @@ def default_render_failure(request, message, status=403,
 def parse_openid_response(request):
     """Parse an OpenID response from a Django request."""
     # Short cut if there is no request parameters.
-    #if len(request.REQUEST) == 0:
+    # if len(request.REQUEST) == 0:
     #    return None
 
     current_url = request.build_absolute_uri()
@@ -164,15 +167,15 @@ def login_begin(request, template_name='openid/login.html',
 
         # Invalid or no form data:
         if openid_url is None:
-            return render_to_response(template_name, {
-                    'form': login_form,
-                    redirect_field_name: redirect_to
-                    }, context_instance=RequestContext(request))
+            context = {'form': login_form, redirect_field_name: redirect_to}
+            return render_to_response(
+                template_name, context,
+                context_instance=RequestContext(request))
 
     consumer = make_consumer(request)
     try:
         openid_request = consumer.begin(openid_url)
-    except DiscoveryFailure, exc:
+    except DiscoveryFailure as exc:
         return render_failure(
             request, "OpenID discovery error: %s" % (str(exc),), status=500,
             exception=exc)
@@ -222,11 +225,11 @@ def login_begin(request, template_name='openid/login.html',
         sreg_optional_fields.extend(
             getattr(settings, 'OPENID_SREG_EXTRA_FIELDS', []))
         sreg_optional_fields = [
-            field for field in sreg_optional_fields if (
-                not field in sreg_required_fields)]
+            field for field in sreg_optional_fields
+            if field not in sreg_required_fields]
         openid_request.addExtension(
             sreg.SRegRequest(optional=sreg_optional_fields,
-                required=sreg_required_fields))
+                             required=sreg_required_fields))
 
     if getattr(settings, 'OPENID_PHYSICAL_MULTIFACTOR_REQUIRED', False):
         preferred_auth = [
@@ -236,13 +239,16 @@ def login_begin(request, template_name='openid/login.html',
         openid_request.addExtension(pape_request)
 
     # Request team info
-    teams_mapping_auto = getattr(settings, 'OPENID_LAUNCHPAD_TEAMS_MAPPING_AUTO', False)
-    teams_mapping_auto_blacklist = getattr(settings, 'OPENID_LAUNCHPAD_TEAMS_MAPPING_AUTO_BLACKLIST', [])
+    teams_mapping_auto = getattr(
+        settings, 'OPENID_LAUNCHPAD_TEAMS_MAPPING_AUTO', False)
+    teams_mapping_auto_blacklist = getattr(
+        settings, 'OPENID_LAUNCHPAD_TEAMS_MAPPING_AUTO_BLACKLIST', [])
     launchpad_teams = getattr(settings, 'OPENID_LAUNCHPAD_TEAMS_MAPPING', {})
     if teams_mapping_auto:
-        #ignore launchpad teams. use all django-groups
+        # ignore launchpad teams. use all django-groups
         launchpad_teams = dict()
-        all_groups = Group.objects.exclude(name__in=teams_mapping_auto_blacklist)
+        all_groups = Group.objects.exclude(
+            name__in=teams_mapping_auto_blacklist)
         for group in all_groups:
             launchpad_teams[group.name] = group.name
 
@@ -270,9 +276,9 @@ def login_begin(request, template_name='openid/login.html',
 def login_complete(request, redirect_field_name=REDIRECT_FIELD_NAME,
                    render_failure=None):
     redirect_to = request.REQUEST.get(redirect_field_name, '')
-    render_failure = render_failure or \
-                     getattr(settings, 'OPENID_RENDER_FAILURE', None) or \
-                     default_render_failure
+    render_failure = (
+        render_failure or getattr(settings, 'OPENID_RENDER_FAILURE', None) or
+        default_render_failure)
 
     openid_response = parse_openid_response(request)
     if not openid_response:
@@ -288,10 +294,12 @@ def login_complete(request, redirect_field_name=REDIRECT_FIELD_NAME,
         if user is not None:
             if user.is_active:
                 auth_login(request, user)
-                response = HttpResponseRedirect(sanitise_redirect_url(redirect_to))
+                response = HttpResponseRedirect(
+                    sanitise_redirect_url(redirect_to))
 
                 # Notify any listeners that we successfully logged in.
-                openid_login_complete.send(sender=UserOpenID, request=request,
+                openid_login_complete.send(
+                    sender=UserOpenID, request=request,
                     openid_response=openid_response)
 
                 return response

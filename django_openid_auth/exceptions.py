@@ -28,19 +28,24 @@
 
 """Exception classes thrown by OpenID Authentication and Validation."""
 
+
 class DjangoOpenIDException(Exception):
     pass
 
+
 class RequiredAttributeNotReturned(DjangoOpenIDException):
     pass
+
 
 class IdentityAlreadyClaimed(DjangoOpenIDException):
 
     def __init__(self, message=None):
         if message is None:
-            self.message = "Another user already exists for your selected OpenID"
+            self.message = (
+                "Another user already exists for your selected OpenID")
         else:
             self.message = message
+
 
 class DuplicateUsernameViolation(DjangoOpenIDException):
 
@@ -50,6 +55,7 @@ class DuplicateUsernameViolation(DjangoOpenIDException):
         else:
             self.message = message
 
+
 class MissingUsernameViolation(DjangoOpenIDException):
 
     def __init__(self, message=None):
@@ -58,11 +64,12 @@ class MissingUsernameViolation(DjangoOpenIDException):
         else:
             self.message = message
 
+
 class MissingPhysicalMultiFactor(DjangoOpenIDException):
 
     def __init__(self, message=None):
         if message is None:
-            self.message = "Login requires physical multi-factor authentication."
+            self.message = (
+                "Login requires physical multi-factor authentication.")
         else:
             self.message = message
-

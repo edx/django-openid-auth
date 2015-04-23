@@ -26,14 +26,16 @@
 # ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+from django.conf.urls import patterns, include
 from django.http import HttpResponse
-from django.conf.urls import *
 
 
 def get_user(request):
     return HttpResponse(request.user.username)
 
-urlpatterns = patterns('',
+
+urlpatterns = patterns(
+    '',
     (r'^getuser/$', get_user),
     (r'^openid/', include('django_openid_auth.urls')),
 )

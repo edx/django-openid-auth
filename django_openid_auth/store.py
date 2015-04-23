@@ -38,8 +38,10 @@ from django_openid_auth.models import Association, Nonce
 
 
 class DjangoOpenIDStore(OpenIDStore):
+
     def __init__(self):
-        self.max_nonce_age = 6 * 60 * 60 # Six hours
+        super(DjangoOpenIDStore, self).__init__()
+        self.max_nonce_age = 6 * 60 * 60  # Six hours
 
     def storeAssociation(self, server_url, association):
         try:

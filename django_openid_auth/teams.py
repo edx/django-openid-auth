@@ -64,31 +64,28 @@ will be provided:
 @since: 2.1.1
 """
 
-from openid.message import registerNamespaceAlias, \
-     NamespaceAliasRegistrationError
-from openid.extension import Extension
 from openid import oidutil
-
-try:
-    basestring #pylint:disable-msg=W0104
-except NameError:
-    # For Python 2.2
-    basestring = (str, unicode) #pylint:disable-msg=W0622
+from openid.extension import Extension
+from openid.message import (
+    registerNamespaceAlias,
+    NamespaceAliasRegistrationError,
+)
 
 __all__ = [
     'TeamsRequest',
     'TeamsResponse',
     'ns_uri',
     'supportsTeams',
-    ]
+]
 
 ns_uri = 'http://ns.launchpad.net/2007/openid-teams'
 
 try:
     registerNamespaceAlias(ns_uri, 'lp')
 except NamespaceAliasRegistrationError, e:
-    oidutil.log('registerNamespaceAlias(%r, %r) failed: %s' % (ns_uri,
-                                                               'lp', str(e),))
+    oidutil.log(
+        'registerNamespaceAlias(%r, %r) failed: %s' % (ns_uri, 'lp', str(e)))
+
 
 def supportsTeams(endpoint):
     """Does the given endpoint advertise support for Launchpad Teams?
@@ -100,6 +97,7 @@ def supportsTeams(endpoint):
     @rtype: bool
     """
     return endpoint.usesExtension(ns_uri)
+
 
 class TeamsNamespaceError(ValueError):
     """The Launchpad teams namespace was not found and could not
@@ -114,6 +112,7 @@ class TeamsNamespaceError(ValueError):
     should not happen unless some code has modified the namespaces for
     the message that is being processed.
     """
+
 
 def getTeamsNS(message):
     """Extract the Launchpad teams namespace URI from the given
@@ -145,7 +144,8 @@ def getTeamsNS(message):
 
     # we know that ns_uri defined, because it's defined in the
     # else clause of the loop as well, so disable the warning
-    return ns_uri #pylint:disable-msg=W0631
+    return ns_uri
+
 
 class TeamsRequest(Extension):
     """An object to hold the state of a Launchpad teams request.
@@ -154,7 +154,8 @@ class TeamsRequest(Extension):
         names that the RP is interested in.
     @type required: [str]
 
-    @group Consumer: requestField, requestTeams, getExtensionArgs, addToOpenIDRequest
+    @group Consumer: requestField, requestTeams, getExtensionArgs,
+                     addToOpenIDRequest
     @group Server: fromOpenIDRequest, parseExtensionArgs
     """
 
@@ -308,6 +309,7 @@ class TeamsRequest(Extension):
 
         return args
 
+
 class TeamsResponse(Extension):
     """Represents the data returned in a Launchpad teams response
     inside of an OpenID C{id_res} response. This object will be
@@ -394,7 +396,6 @@ class TeamsResponse(Extension):
         if "is_member" in args:
             is_member_str = args["is_member"]
             self.is_member = is_member_str.split(',')
-            #self.is_member = args["is_member"]
 
         return self
 
@@ -406,6 +407,5 @@ class TeamsResponse(Extension):
 
         @see: openid.extension
         """
-        ns_args = {'is_member': ','.join(self.is_member),}
+        ns_args = {'is_member': ','.join(self.is_member)}
         return ns_args
-

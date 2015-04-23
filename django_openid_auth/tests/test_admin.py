@@ -25,35 +25,17 @@
 # LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
 # ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
-"""
-Tests for the django_openid_auth Admin login form replacement.
-"""
 
-import unittest
+"""Tests for the django_openid_auth Admin login form replacement."""
 
 from django.conf import settings
-from django.contrib.auth.models import User, AnonymousUser
-
-settings.OPENID_USE_AS_ADMIN_LOGIN = True
+from django.contrib.auth.models import User
 
 from django.test import TestCase
+from django.test.utils import override_settings
 
 
-def create_user(is_staff=False, authenticated=True):
-    """
-    Create and return a user, either the AnonymousUser or a normal Django user,
-    setting the is_staff attribute if appropriate.
-    """
-    if not authenticated:
-        return AnonymousUser()
-    else:
-        user = User(
-            username=u'testing', email='testing@example.com',
-            is_staff=is_staff)
-        user.set_password(u'test')
-        user.save()
-
-
+@override_settings(OPENID_USE_AS_ADMIN_LOGIN=True)
 class SiteAdminTests(TestCase):
     """
     TestCase for accessing /admin/ when the django_openid_auth form replacement
@@ -65,23 +47,21 @@ class SiteAdminTests(TestCase):
         If the request has an authenticated user, who is not flagged as a
         staff member, then they get a failure response.
         """
-        create_user()
-        self.client.login(username='testing', password='test')
-        response = self.client.get('/admin/')
-        self.assertTrue('User testing does not have admin access.' in
-                        response.content, 'Missing error message in response')
+        User.objects.create_user(
+            username=u'testing', email='testing@example.com', password=u'test')
+        assert self.client.login(username='testing', password='test')
+        response = self.client.get('/admin/', follow=True)
+        self.assertContains(
+            response,
+            'User testing does not have admin/staff access.', status_code=403)
 
     def test_admin_site_with_openid_login_non_authenticated_user(self):
         """
         Unauthenticated users accessing the admin page should be directed to
         the OpenID login url.
         """
-        response = self.client.get('/admin/')
-        self.assertEqual(302, response.status_code)
-        self.assertEqual('http://testserver' + getattr(settings, 'LOGIN_URL',
-                         '/openid/login') + '?next=/admin/',
-                         response['Location'])
-
-
-def suite():
-    return unittest.TestLoader().loadTestsFromName(__name__)
+        response = self.client.get('/admin/', follow=True)
+        self.assertRedirects(
+            response,
+            getattr(settings, 'LOGIN_URL', '/openid/login') +
+            '?next=%2Fadmin%2F')

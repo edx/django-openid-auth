@@ -93,8 +93,9 @@ class OpenIDBackend:
 
         if getattr(settings, 'OPENID_PHYSICAL_MULTIFACTOR_REQUIRED', False):
             pape_response = pape.Response.fromSuccessResponse(openid_response)
-            if pape_response is None or \
-               pape.AUTH_MULTI_FACTOR_PHYSICAL not in pape_response.auth_policies:
+            key = pape.AUTH_MULTI_FACTOR_PHYSICAL
+            if (pape_response is None or
+                    key not in pape_response.auth_policies):
                 raise MissingPhysicalMultiFactor()
 
         teams_response = teams.TeamsResponse.fromSuccessResponse(
@@ -194,12 +195,12 @@ class OpenIDBackend:
             if nickname is None or nickname == '':
                 raise MissingUsernameViolation()
 
-        # If we don't have a nickname, and we're not being strict, use a default
+        # If we don't have a nickname, and we're not being strict, use default
         nickname = nickname or 'openiduser'
 
         # See if we already have this nickname assigned to a username
         try:
-            user = User.objects.get(username__exact=nickname)
+            User.objects.get(username__exact=nickname)
         except User.DoesNotExist:
             # No conflict, we can use this nickname
             return nickname
@@ -231,7 +232,6 @@ class OpenIDBackend:
             # No user associated with this identity_url
             pass
 
-
         if getattr(settings, 'OPENID_STRICT_USERNAMES', False):
             if User.objects.filter(username__exact=nickname).count() > 0:
                 raise DuplicateUsernameViolation(
@@ -248,7 +248,7 @@ class OpenIDBackend:
             if i > 1:
                 username += str(i)
             try:
-                user = User.objects.get(username__exact=username)
+                User.objects.get(username__exact=username)
             except User.DoesNotExist:
                 break
             i += 1
@@ -266,12 +266,12 @@ class OpenIDBackend:
                     "An attribute required for logging in was not "
                     "returned ({0}).".format(required_attr))
 
-        nickname = self._get_preferred_username(details['nickname'],
-            details['email'])
+        nickname = self._get_preferred_username(
+            details['nickname'], details['email'])
         email = details['email'] or ''
 
-        username = self._get_available_username(nickname,
-            openid_response.identity_url)
+        username = self._get_available_username(
+            nickname, openid_response.identity_url)
 
         user = User.objects.create_user(username, email, password=None)
         self.associate_openid(user, openid_response)
@@ -328,13 +328,16 @@ class OpenIDBackend:
             user.save()
 
     def get_teams_mapping(self):
-        teams_mapping_auto = getattr(settings, 'OPENID_LAUNCHPAD_TEAMS_MAPPING_AUTO', False)
-        teams_mapping_auto_blacklist = getattr(settings, 'OPENID_LAUNCHPAD_TEAMS_MAPPING_AUTO_BLACKLIST', [])
+        teams_mapping_auto = getattr(
+            settings, 'OPENID_LAUNCHPAD_TEAMS_MAPPING_AUTO', False)
+        teams_mapping_auto_blacklist = getattr(
+            settings, 'OPENID_LAUNCHPAD_TEAMS_MAPPING_AUTO_BLACKLIST', [])
         teams_mapping = getattr(settings, 'OPENID_LAUNCHPAD_TEAMS_MAPPING', {})
         if teams_mapping_auto:
-            #ignore teams_mapping. use all django-groups
+            # ignore teams_mapping. use all django-groups
             teams_mapping = dict()
-            all_groups = Group.objects.exclude(name__in=teams_mapping_auto_blacklist)
+            all_groups = Group.objects.exclude(
+                name__in=teams_mapping_auto_blacklist)
             for group in all_groups:
                 teams_mapping[group.name] = group.name
         return teams_mapping
@@ -344,12 +347,12 @@ class OpenIDBackend:
         if len(teams_mapping) == 0:
             return
 
-        current_groups = set(user.groups.filter(
-                name__in=teams_mapping.values()))
-        desired_groups = set(Group.objects.filter(
-                name__in=[teams_mapping[lp_team]
-                          for lp_team in teams_response.is_member
-                          if lp_team in teams_mapping]))
+        mapping = [
+            teams_mapping[lp_team] for lp_team in teams_response.is_member
+            if lp_team in teams_mapping]
+        current_groups = set(
+            user.groups.filter(name__in=teams_mapping.values()))
+        desired_groups = set(Group.objects.filter(name__in=mapping))
         for group in current_groups - desired_groups:
             user.groups.remove(group)
         for group in desired_groups - current_groups:

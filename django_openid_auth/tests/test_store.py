@@ -27,7 +27,6 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 import time
-import unittest
 
 from django.test import TestCase
 from openid.association import Association as OIDAssociation
@@ -187,7 +186,3 @@ class OpenIDStoreTests(TestCase):
         # The second (non-expired) association is left behind.
         self.assertNotEqual(self.store.getAssociation('server-url', 'handle2'),
                             None)
-
-
-def suite():
-    return unittest.TestLoader().loadTestsFromName(__name__)

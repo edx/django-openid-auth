@@ -27,6 +27,9 @@
 # ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+from urllib import urlencode
+from urlparse import parse_qsl, urlparse
+
 from django.conf import settings
 from django.contrib import admin
 from django_openid_auth.models import Nonce, Association, UserOpenID
@@ -69,22 +72,39 @@ class UserOpenIDAdmin(admin.ModelAdmin):
 admin.site.register(UserOpenID, UserOpenIDAdmin)
 
 
-# Support for allowing openid authentication for /admin (django.contrib.admin)
-if getattr(settings, 'OPENID_USE_AS_ADMIN_LOGIN', False):
-    from django.http import HttpResponseRedirect
-    from django_openid_auth import views
+# override a single time
+original_admin_login = None
+if original_admin_login is None:
+    original_admin_login = admin.sites.AdminSite.login
 
-    def _openid_login(self, request, error_message='', extra_context=None):
-        if request.user.is_authenticated():
-            if not request.user.is_staff:
-                return views.default_render_failure(
-                    request, "User %s does not have admin access."
-                    % request.user.username)
-            assert error_message, "Unknown Error: %s" % error_message
-        else:
-            # Redirect to openid login path,
-            return HttpResponseRedirect(
-                settings.LOGIN_URL + "?next=" + request.get_full_path())
 
-    # Overide the standard admin login form.
-    admin.sites.AdminSite.login = _openid_login
+from django.http import HttpResponseRedirect
+from django_openid_auth import views
+
+
+def _openid_login(instance, request, error_message='', extra_context=None):
+    # Support for allowing openid authentication for /admin
+    # (django.contrib.admin)
+    if not getattr(settings, 'OPENID_USE_AS_ADMIN_LOGIN', False):
+        return original_admin_login(
+            instance, request, extra_context=extra_context)
+
+    if not request.user.is_authenticated():
+        # Redirect to openid login path,
+        _, _, path, _, query, _ = urlparse(request.get_full_path())
+        qs = dict(parse_qsl(query))
+        qs.setdefault('next', path)
+        return HttpResponseRedirect(
+            settings.LOGIN_URL + "?" + urlencode(qs))
+
+    if not request.user.is_staff:
+        return views.default_render_failure(
+            request, "User %s does not have admin/staff access."
+            % request.user.username)
+
+    # No error message was supplied
+    assert error_message, "Unknown Error: %s" % error_message
+
+
+# Overide the standard admin login form.
+admin.sites.AdminSite.login = _openid_login
