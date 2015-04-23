@@ -107,6 +107,9 @@ USE_TZ = True
 
 STATIC_URL = '/static/'
 
+# the library python-openid does not support a json session serializer
+# <openid.yadis.manager.YadisServiceManager> is not JSON serializable
+# https://github.com/openid/python-openid/issues/17
 SESSION_SERIALIZER = 'django.contrib.sessions.serializers.PickleSerializer'
 
 AUTHENTICATION_BACKENDS = (
