@@ -46,8 +46,9 @@ class SessionSerializerTest(TestCase):
     [0] https://bit.ly/1myzetd
     [1] https://github.com/openid/python-openid/issues/17
     """
+
     @skipIf(VERSION < (1, 5), "Django 1.4 does not provide SESSION_SERIALIZER")
-    def test_using_json_session_serializer(self):
+    def test_using_pickle_session_serializer(self):
         serializer = getattr(settings, 'SESSION_SERIALIZER', '')
         self.assertEqual(
             serializer, 'django.contrib.sessions.serializers.PickleSerializer')
