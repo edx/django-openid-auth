@@ -77,9 +77,7 @@ admin.site.register(UserOpenID, UserOpenIDAdmin)
 
 
 # override a single time
-original_admin_login = None
-if original_admin_login is None:
-    original_admin_login = admin.sites.AdminSite.login
+original_admin_login = admin.sites.AdminSite.login
 
 
 def _openid_login(instance, request, error_message='', extra_context=None):
