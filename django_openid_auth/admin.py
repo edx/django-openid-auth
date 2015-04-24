@@ -76,7 +76,7 @@ class UserOpenIDAdmin(admin.ModelAdmin):
 admin.site.register(UserOpenID, UserOpenIDAdmin)
 
 
-# override a single time
+# store a reference to the original admin login
 original_admin_login = admin.sites.AdminSite.login
 
 
