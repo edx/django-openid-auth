@@ -27,7 +27,7 @@
 # ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-from django.conf.urls import *
+from django.conf.urls import patterns, include, url
 from django.contrib import admin
 
 import views
@@ -35,11 +35,12 @@ import views
 
 admin.autodiscover()
 
-urlpatterns = patterns('',
-    (r'^$', views.index),
-    (r'^openid/', include('django_openid_auth.urls')),
-    (r'^logout/$', 'django.contrib.auth.views.logout'),
-    (r'^private/$', views.require_authentication),
+urlpatterns = patterns(
+    '',
+    url(r'^$', views.index),
+    url(r'^openid/', include('django_openid_auth.urls')),
+    url(r'^logout/$', 'django.contrib.auth.views.logout'),
+    url(r'^private/$', views.require_authentication),
 
-    (r'^admin/', include(admin.site.urls)),
+    url(r'^admin/', include(admin.site.urls)),
 )
