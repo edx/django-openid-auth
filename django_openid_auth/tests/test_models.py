@@ -26,7 +26,7 @@
 # ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-import unittest
+from __future__ import unicode_literals
 
 from django.contrib.auth.models import User
 from django.test import TestCase
@@ -72,7 +72,3 @@ class UserOpenIDModelTestCase(TestCase):
         self.assertFalse(
             User.objects.get(username='someuser').has_perm(
                 'django_openid_auth.account_verified'))
-
-
-def suite():
-    return unittest.TestLoader().loadTestsFromName(__name__)

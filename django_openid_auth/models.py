@@ -27,11 +27,10 @@
 # ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-from django.contrib.auth.models import (
-    Permission,
-    User,
-)
+from __future__ import unicode_literals
+
 from django.db import models
+from django.contrib.auth.models import Permission, User
 
 
 class Nonce(models.Model):
@@ -46,7 +45,7 @@ class Nonce(models.Model):
 class Association(models.Model):
     server_url = models.TextField(max_length=2047)
     handle = models.CharField(max_length=255)
-    secret = models.TextField(max_length=255) # Stored base64 encoded
+    secret = models.TextField(max_length=255)  # Stored base64 encoded
     issued = models.IntegerField()
     lifetime = models.IntegerField()
     assoc_type = models.TextField(max_length=64)

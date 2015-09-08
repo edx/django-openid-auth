@@ -1,6 +1,5 @@
-./django
-./MANIFEST
-./build
-./dist
-./sqlite.db
-./.tox/
+MANIFEST
+build
+dist
+db.sqlite3
+.tox

@@ -43,7 +43,7 @@ from setuptools import find_packages, setup
 
 
 description, long_description = __doc__.split('\n\n', 1)
-VERSION = '0.5.1'
+VERSION = '0.6'
 
 setup(
     name='django-openid-auth',

@@ -27,14 +27,19 @@
 # ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+from __future__ import unicode_literals
+
 import cgi
-import unittest
-from urllib import quote_plus
+
+from urlparse import parse_qs
 
 from django.conf import settings
 from django.contrib.auth.models import User, Group, Permission
+from django.core.urlresolvers import reverse
 from django.http import HttpRequest, HttpResponse
 from django.test import TestCase
+from django.test.utils import override_settings
+from mock import patch
 from openid.consumer.consumer import Consumer, SuccessResponse
 from openid.consumer.discover import OpenIDServiceEndpoint
 from openid.extensions import ax, sreg, pape
@@ -67,6 +72,7 @@ ET = importElementTree()
 class StubOpenIDProvider(HTTPFetcher):
 
     def __init__(self, base_url):
+        super(StubOpenIDProvider, self).__init__()
         self.store = MemoryStore()
         self.identity_url = base_url + 'identity'
         self.localid_url = base_url + 'localid'
@@ -136,7 +142,9 @@ class StubOpenIDProvider(HTTPFetcher):
 
 
 class DummyDjangoRequest(object):
+
     def __init__(self, request_path):
+        super(DummyDjangoRequest, self).__init__()
         self.request_path = request_path
         self.META = {
             'HTTP_HOST': "localhost",
@@ -164,8 +172,23 @@ class DummyDjangoRequest(object):
 
 
 @override_session_serializer
+@override_settings(
+    OPENID_CREATE_USERS=False,
+    OPENID_STRICT_USERNAMES=False,
+    OPENID_UPDATE_DETAILS_FROM_SREG=False,
+    OPENID_SSO_SERVER_URL=None,
+    OPENID_LAUNCHPAD_TEAMS_MAPPING={},
+    OPENID_USE_AS_ADMIN_LOGIN=False,
+    OPENID_FOLLOW_RENAMES=False,
+    OPENID_PHYSICAL_MULTIFACTOR_REQUIRED=False,
+    OPENID_SREG_REQUIRED_FIELDS=[],
+    OPENID_USE_EMAIL_FOR_USERNAME=False,
+    OPENID_VALID_VERIFICATION_SCHEMES={},
+)
 class RelyingPartyTests(TestCase):
+
     urls = 'django_openid_auth.tests.urls'
+    login_url = reverse('openid-login')
 
     def setUp(self):
         super(RelyingPartyTests, self).setUp()
@@ -178,70 +201,16 @@ class RelyingPartyTests(TestCase):
         self.consumer = make_consumer(self.req)
         self.server = Server(DjangoOpenIDStore(), op_endpoint=server_url)
         setDefaultFetcher(self.provider, wrap_exceptions=False)
+        self.addCleanup(setDefaultFetcher, None)
 
-        self.old_login_redirect_url = getattr(
-            settings, 'LOGIN_REDIRECT_URL', '/accounts/profile/')
-        self.old_create_users = getattr(
-            settings, 'OPENID_CREATE_USERS', False)
-        self.old_strict_usernames = getattr(
-            settings, 'OPENID_STRICT_USERNAMES', False)
-        self.old_update_details = getattr(
-            settings, 'OPENID_UPDATE_DETAILS_FROM_SREG', False)
-        self.old_sso_server_url = getattr(
-            settings, 'OPENID_SSO_SERVER_URL', None)
-        self.old_teams_map = getattr(
-            settings, 'OPENID_LAUNCHPAD_TEAMS_MAPPING', {})
-        self.old_use_as_admin_login = getattr(
-            settings, 'OPENID_USE_AS_ADMIN_LOGIN', False)
-        self.old_follow_renames = getattr(
-            settings, 'OPENID_FOLLOW_RENAMES', False)
-        self.old_physical_multifactor = getattr(
-            settings, 'OPENID_PHYSICAL_MULTIFACTOR_REQUIRED', False)
-        self.old_login_render_failure = getattr(
-            settings, 'OPENID_RENDER_FAILURE', None)
-        self.old_openid_use_email_for_username = getattr(
-            settings,
-            'OPENID_USE_EMAIL_FOR_USERNAME', False)
-        self.old_required_fields = getattr(
-            settings, 'OPENID_SREG_REQUIRED_FIELDS', [])
-        self.old_valid_verification_schemes = getattr(
-            settings, 'OPENID_VALID_VERIFICATION_SCHEMES', {})
-
-        self.old_consumer_complete = Consumer.complete
-
-        settings.OPENID_CREATE_USERS = False
-        settings.OPENID_STRICT_USERNAMES = False
-        settings.OPENID_UPDATE_DETAILS_FROM_SREG = False
-        settings.OPENID_SSO_SERVER_URL = None
-        settings.OPENID_LAUNCHPAD_TEAMS_MAPPING = {}
-        settings.OPENID_USE_AS_ADMIN_LOGIN = False
-        settings.OPENID_FOLLOW_RENAMES = False
-        settings.OPENID_PHYSICAL_MULTIFACTOR_REQUIRED = False
-        settings.OPENID_SREG_REQUIRED_FIELDS = []
-        settings.OPENID_USE_EMAIL_FOR_USERNAME = False
-        settings.OPENID_VALID_VERIFICATION_SCHEMES = {}
-
-    def tearDown(self):
-        settings.LOGIN_REDIRECT_URL = self.old_login_redirect_url
-        settings.OPENID_CREATE_USERS = self.old_create_users
-        settings.OPENID_STRICT_USERNAMES = self.old_strict_usernames
-        settings.OPENID_UPDATE_DETAILS_FROM_SREG = self.old_update_details
-        settings.OPENID_SSO_SERVER_URL = self.old_sso_server_url
-        settings.OPENID_LAUNCHPAD_TEAMS_MAPPING = self.old_teams_map
-        settings.OPENID_USE_AS_ADMIN_LOGIN = self.old_use_as_admin_login
-        settings.OPENID_FOLLOW_RENAMES = self.old_follow_renames
-        settings.OPENID_PHYSICAL_MULTIFACTOR_REQUIRED = (
-            self.old_physical_multifactor)
-        settings.OPENID_RENDER_FAILURE = self.old_login_render_failure
-        Consumer.complete = self.old_consumer_complete
-        settings.OPENID_SREG_REQUIRED_FIELDS = self.old_required_fields
-        settings.OPENID_USE_EMAIL_FOR_USERNAME = (
-            self.old_openid_use_email_for_username)
-        settings.OPENID_VALID_VERIFICATION_SCHEMES = (
-            self.old_valid_verification_schemes)
-
-        setDefaultFetcher(None)
-        super(RelyingPartyTests, self).tearDown()
+        self.openid_req_no_next = {
+            'openid_identifier': 'http://example.com/identity'}
+        self.openid_req = {
+            'openid_identifier': 'http://example.com/identity',
+            'next': '/getuser/'}
+        self.openid_resp = {
+            'nickname': 'testuser', 'fullname': 'Openid User',
+            'email': 'test@example.com'}
 
     def complete(self, openid_response):
         """Complete an OpenID authentication request."""
@@ -249,36 +218,33 @@ class RelyingPartyTests(TestCase):
         # here.  For simplicity, force generation of a redirect.
         openid_response.whichEncoding = lambda: ENCODE_URL
         webresponse = self.provider.server.encodeResponse(openid_response)
-        self.assertEquals(webresponse.code, 302)
+        self.assertEqual(webresponse.code, 302)
         redirect_to = webresponse.headers['location']
         self.assertTrue(redirect_to.startswith(
             'http://testserver/openid/complete/'))
         return self.client.get(
-            '/openid/complete/',
+            reverse('openid-complete'),
             dict(cgi.parse_qsl(redirect_to.split('?', 1)[1])))
 
     def test_login(self):
         user = User.objects.create_user('someuser', 'someone@example.com')
-        useropenid = UserOpenID(
+        UserOpenID.objects.create(
             user=user,
             claimed_id='http://example.com/identity',
             display_id='http://example.com/identity')
-        useropenid.save()
 
         # The login form is displayed:
-        response = self.client.get('/openid/login/')
+        response = self.client.get(self.login_url)
         self.assertTemplateUsed(response, 'openid/login.html')
 
         # Posting in an identity URL begins the authentication request:
-        response = self.client.post('/openid/login/',
-            {'openid_identifier': 'http://example.com/identity',
-             'next': '/getuser/'})
+        response = self.client.post(self.login_url, self.openid_req)
         self.assertContains(response, 'OpenID transaction in progress')
 
         openid_request = self.provider.parseFormPost(response.content)
-        self.assertEquals(openid_request.mode, 'checkid_setup')
+        self.assertEqual(openid_request.mode, 'checkid_setup')
         self.assertTrue(openid_request.return_to.startswith(
-                'http://testserver/openid/complete/'))
+            'http://testserver/openid/complete/'))
 
         # Complete the request.  The user is redirected to the next URL.
         openid_response = openid_request.answer(True)
@@ -287,59 +253,59 @@ class RelyingPartyTests(TestCase):
 
         # And they are now logged in:
         response = self.client.get('/getuser/')
-        self.assertEquals(response.content, 'someuser')
+        self.assertEqual(response.content, 'someuser')
 
     def test_login_with_nonascii_return_to(self):
         """Ensure non-ascii characters can be used for the 'next' arg."""
-        response = self.client.post('/openid/login/',
+        response = self.client.post(
+            self.login_url,
             {'openid_identifier': 'http://example.com/identity',
-             'next': u'/files/ñandú.jpg'.encode('utf-8')})
+             'next': '/files/ñandú.jpg'.encode('utf-8')})
         self.assertContains(response, 'OpenID transaction in progress')
 
     def test_login_no_next(self):
         """Logins with no next parameter redirect to LOGIN_REDIRECT_URL."""
         user = User.objects.create_user('someuser', 'someone@example.com')
-        useropenid = UserOpenID(
+        UserOpenID.objects.create(
             user=user,
             claimed_id='http://example.com/identity',
             display_id='http://example.com/identity')
-        useropenid.save()
 
-        settings.LOGIN_REDIRECT_URL = '/getuser/'
-        response = self.client.post('/openid/login/',
-            {'openid_identifier': 'http://example.com/identity'})
+        response = self.client.post(self.login_url, self.openid_req_no_next)
+
         self.assertContains(response, 'OpenID transaction in progress')
 
         openid_request = self.provider.parseFormPost(response.content)
-        self.assertEquals(openid_request.mode, 'checkid_setup')
+        self.assertEqual(openid_request.mode, 'checkid_setup')
         self.assertTrue(openid_request.return_to.startswith(
-                'http://testserver/openid/complete/'))
+            'http://testserver/openid/complete/'))
 
         # Complete the request.  The user is redirected to the next URL.
         openid_response = openid_request.answer(True)
-        response = self.complete(openid_response)
-        self.assertRedirects(
-            response, 'http://testserver' + settings.LOGIN_REDIRECT_URL)
+        with self.settings(LOGIN_REDIRECT_URL='/getuser/'):
+            response = self.complete(openid_response)
+        self.assertRedirects(response, 'http://testserver/getuser/')
 
     def test_login_sso(self):
-        settings.OPENID_SSO_SERVER_URL = 'http://example.com/identity'
         user = User.objects.create_user('someuser', 'someone@example.com')
-        useropenid = UserOpenID(
+        UserOpenID.objects.create(
             user=user,
             claimed_id='http://example.com/identity',
             display_id='http://example.com/identity')
-        useropenid.save()
 
         # Requesting the login form immediately begins an
         # authentication request.
-        response = self.client.get('/openid/login/', {'next': '/getuser/'})
-        self.assertEquals(response.status_code, 200)
+        with self.settings(
+                OPENID_SSO_SERVER_URL='http://example.com/identity'):
+            response = self.client.get(self.login_url, {'next': '/getuser/'})
+
+        self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'OpenID transaction in progress')
 
         openid_request = self.provider.parseFormPost(response.content)
-        self.assertEquals(openid_request.mode, 'checkid_setup')
+        self.assertEqual(openid_request.mode, 'checkid_setup')
         self.assertTrue(openid_request.return_to.startswith(
-                'http://testserver/openid/complete/'))
+            'http://testserver/openid/complete/'))
 
         # Complete the request.  The user is redirected to the next URL.
         openid_response = openid_request.answer(True)
@@ -348,17 +314,14 @@ class RelyingPartyTests(TestCase):
 
         # And they are now logged in:
         response = self.client.get('/getuser/')
-        self.assertEquals(response.content, 'someuser')
+        self.assertEqual(response.content, 'someuser')
 
     def test_login_create_users(self):
-        settings.OPENID_CREATE_USERS = True
         # Create a user with the same name as we'll pass back via sreg.
         User.objects.create_user('someuser', 'someone@example.com')
 
         # Posting in an identity URL begins the authentication request:
-        response = self.client.post('/openid/login/',
-            {'openid_identifier': 'http://example.com/identity',
-             'next': '/getuser/'})
+        response = self.client.post(self.login_url, self.openid_req)
         self.assertContains(response, 'OpenID transaction in progress')
 
         # Complete the request, passing back some simple registration
@@ -370,19 +333,20 @@ class RelyingPartyTests(TestCase):
             sreg_request, {'nickname': 'someuser', 'fullname': 'Some User',
                            'email': 'foo@example.com'})
         openid_response.addExtension(sreg_response)
-        response = self.complete(openid_response)
+        with self.settings(OPENID_CREATE_USERS=True):
+            response = self.complete(openid_response)
         self.assertRedirects(response, 'http://testserver/getuser/')
 
         # And they are now logged in as a new user (they haven't taken
         # over the existing "someuser" user).
         response = self.client.get('/getuser/')
-        self.assertEquals(response.content, 'someuser2')
+        self.assertEqual(response.content, 'someuser2')
 
         # Check the details of the new user.
         user = User.objects.get(username='someuser2')
-        self.assertEquals(user.first_name, 'Some')
-        self.assertEquals(user.last_name, 'User')
-        self.assertEquals(user.email, 'foo@example.com')
+        self.assertEqual(user.first_name, 'Some')
+        self.assertEqual(user.last_name, 'User')
+        self.assertEqual(user.email, 'foo@example.com')
 
     def _do_user_login(self, req_data, resp_data, use_sreg=True,
                        use_pape=None):
@@ -395,7 +359,7 @@ class RelyingPartyTests(TestCase):
 
     def _get_login_request(self, req_data):
         # Posting in an identity URL begins the authentication request:
-        response = self.client.post('/openid/login/', req_data)
+        response = self.client.post(self.login_url, req_data)
         self.assertContains(response, 'OpenID transaction in progress')
 
         # Complete the request, passing back some simple registration
@@ -413,27 +377,17 @@ class RelyingPartyTests(TestCase):
                 sreg_request, resp_data)
             openid_response.addExtension(sreg_response)
         if use_pape is not None:
-            policies = [
-                use_pape
-            ]
+            policies = [use_pape]
             pape_response = pape.Response(auth_policies=policies)
             openid_response.addExtension(pape_response)
         return openid_response
 
-    def parse_query_string(self, query_str):
-        query_items = map(tuple,
-            [item.split('=') for item in query_str.split('&')])
-        query = dict(query_items)
-        return query
-
+    @override_settings(OPENID_PHYSICAL_MULTIFACTOR_REQUIRED=True)
     def test_login_physical_multifactor_request(self):
-        settings.OPENID_PHYSICAL_MULTIFACTOR_REQUIRED = True
         preferred_auth = pape.AUTH_MULTI_FACTOR_PHYSICAL
         self.provider.type_uris.append(pape.ns_uri)
 
-        openid_req = {'openid_identifier': 'http://example.com/identity',
-               'next': '/getuser/'}
-        response = self.client.post('/openid/login/', openid_req)
+        response = self.client.post(self.login_url, self.openid_req)
         openid_request = self.provider.parseFormPost(response.content)
 
         request_auth = openid_request.message.getArg(
@@ -442,85 +396,82 @@ class RelyingPartyTests(TestCase):
         )
         self.assertEqual(request_auth, preferred_auth)
 
+    @override_settings(OPENID_PHYSICAL_MULTIFACTOR_REQUIRED=True)
     def test_login_physical_multifactor_response(self):
-        settings.OPENID_PHYSICAL_MULTIFACTOR_REQUIRED = True
         preferred_auth = pape.AUTH_MULTI_FACTOR_PHYSICAL
         self.provider.type_uris.append(pape.ns_uri)
 
         def mock_complete(this, request_args, return_to):
-            request = {'openid.mode': 'checkid_setup',
-                       'openid.trust_root': 'http://localhost/',
-                       'openid.return_to': 'http://localhost/',
-                       'openid.identity': IDENTIFIER_SELECT,
-                       'openid.ns.pape' : pape.ns_uri,
-                       'openid.pape.auth_policies': request_args.get('openid.pape.auth_policies', pape.AUTH_NONE),
+            request = {
+                'openid.mode': 'checkid_setup',
+                'openid.trust_root': 'http://localhost/',
+                'openid.return_to': 'http://localhost/',
+                'openid.identity': IDENTIFIER_SELECT,
+                'openid.ns.pape': pape.ns_uri,
+                'openid.pape.auth_policies': request_args.get(
+                    'openid.pape.auth_policies', pape.AUTH_NONE),
             }
             openid_server = self.provider.server
             orequest = openid_server.decodeRequest(request)
             response = SuccessResponse(
                 self.endpoint, orequest.message,
-                signed_fields=['openid.pape.auth_policies',])
+                signed_fields=['openid.pape.auth_policies'])
             return response
-        Consumer.complete = mock_complete
+
+        patch.object(Consumer, 'complete', mock_complete)
 
         user = User.objects.create_user('testuser', 'test@example.com')
-        useropenid = UserOpenID(
+        UserOpenID.objects.create(
             user=user,
             claimed_id='http://example.com/identity',
             display_id='http://example.com/identity')
-        useropenid.save()
 
-        openid_req = {'openid_identifier': 'http://example.com/identity',
-               'next': '/getuser/'}
-        openid_resp =  {'nickname': 'testuser', 'fullname': 'Openid User',
-                 'email': 'test@example.com'}
+        response = self._do_user_login(
+            self.openid_req, self.openid_resp,
+            use_pape=pape.AUTH_MULTI_FACTOR_PHYSICAL)
 
-        response = self._do_user_login(openid_req, openid_resp, use_pape=pape.AUTH_MULTI_FACTOR_PHYSICAL)
-
-        query = self.parse_query_string(response.request['QUERY_STRING'])
+        query = parse_qs(response.request['QUERY_STRING'])
         self.assertTrue('openid.pape.auth_policies' in query)
-        self.assertEqual(query['openid.pape.auth_policies'],
-                quote_plus(preferred_auth))
+        self.assertEqual(
+            query['openid.pape.auth_policies'], [preferred_auth])
 
         response = self.client.get('/getuser/')
         self.assertEqual(response.content, 'testuser')
 
-
+    @override_settings(OPENID_PHYSICAL_MULTIFACTOR_REQUIRED=True)
     def test_login_physical_multifactor_not_provided(self):
-        settings.OPENID_PHYSICAL_MULTIFACTOR_REQUIRED = True
         preferred_auth = pape.AUTH_MULTI_FACTOR_PHYSICAL
         self.provider.type_uris.append(pape.ns_uri)
 
         def mock_complete(this, request_args, return_to):
-            request = {'openid.mode': 'checkid_setup',
-                       'openid.trust_root': 'http://localhost/',
-                       'openid.return_to': 'http://localhost/',
-                       'openid.identity': IDENTIFIER_SELECT,
-                       'openid.ns.pape' : pape.ns_uri,
-                       'openid.pape.auth_policies': request_args.get('openid.pape.auth_policies', pape.AUTH_NONE),
+            request = {
+                'openid.mode': 'checkid_setup',
+                'openid.trust_root': 'http://localhost/',
+                'openid.return_to': 'http://localhost/',
+                'openid.identity': IDENTIFIER_SELECT,
+                'openid.ns.pape': pape.ns_uri,
+                'openid.pape.auth_policies': request_args.get(
+                    'openid.pape.auth_policies', pape.AUTH_NONE),
             }
             openid_server = self.provider.server
             orequest = openid_server.decodeRequest(request)
             response = SuccessResponse(
                 self.endpoint, orequest.message,
-                signed_fields=['openid.pape.auth_policies',])
+                signed_fields=['openid.pape.auth_policies'])
             return response
-        Consumer.complete = mock_complete
+
+        patch.object(Consumer, 'complete', mock_complete)
 
         user = User.objects.create_user('testuser', 'test@example.com')
-        useropenid = UserOpenID(
+        UserOpenID.objects.create(
             user=user,
             claimed_id='http://example.com/identity',
             display_id='http://example.com/identity')
-        useropenid.save()
 
-        openid_req = {'openid_identifier': 'http://example.com/identity',
-               'next': '/getuser/'}
-        openid_resp =  {'nickname': 'testuser', 'fullname': 'Openid User',
-                 'email': 'test@example.com'}
-
-        openid_request = self._get_login_request(openid_req)
-        openid_response = self._get_login_response(openid_request, openid_req, openid_resp, use_pape=pape.AUTH_NONE)
+        openid_request = self._get_login_request(self.openid_req)
+        openid_response = self._get_login_response(
+            openid_request, self.openid_req, self.openid_resp,
+            use_pape=pape.AUTH_NONE)
 
         response_auth = openid_request.message.getArg(
             'http://specs.openid.net/extensions/pape/1.0',
@@ -529,12 +480,16 @@ class RelyingPartyTests(TestCase):
         self.assertNotEqual(response_auth, preferred_auth)
 
         response = self.complete(openid_response)
-        self.assertEquals(403, response.status_code)
-        self.assertContains(response, '<h1>OpenID failed</h1>', status_code=403)
-        self.assertContains(response, '<p>Login requires physical multi-factor authentication.</p>', status_code=403)
+        self.assertEqual(403, response.status_code)
+        self.assertContains(
+            response, '<h1>OpenID failed</h1>', status_code=403)
+        self.assertContains(
+            response,
+            '<p>Login requires physical multi-factor authentication.</p>',
+            status_code=403)
 
+    @override_settings(OPENID_PHYSICAL_MULTIFACTOR_REQUIRED=True)
     def test_login_physical_multifactor_not_provided_override(self):
-        settings.OPENID_PHYSICAL_MULTIFACTOR_REQUIRED = True
         preferred_auth = pape.AUTH_MULTI_FACTOR_PHYSICAL
         self.provider.type_uris.append(pape.ns_uri)
 
@@ -542,40 +497,39 @@ class RelyingPartyTests(TestCase):
         def mock_login_failure_handler(request, message, status=403,
                                        template_name=None,
                                        exception=None):
-           self.assertTrue(isinstance(exception, MissingPhysicalMultiFactor))
-           return HttpResponse('Test Failure Override', status=200)
-        settings.OPENID_RENDER_FAILURE = mock_login_failure_handler
+            self.assertIsInstance(exception, MissingPhysicalMultiFactor)
+            return HttpResponse('Test Failure Override', status=200)
 
         def mock_complete(this, request_args, return_to):
-            request = {'openid.mode': 'checkid_setup',
-                       'openid.trust_root': 'http://localhost/',
-                       'openid.return_to': 'http://localhost/',
-                       'openid.identity': IDENTIFIER_SELECT,
-                       'openid.ns.pape' : pape.ns_uri,
-                       'openid.pape.auth_policies': request_args.get('openid.pape.auth_policies', pape.AUTH_NONE),
+            pape_policy = request_args.get(
+                'openid.pape.auth_policies', pape.AUTH_NONE)
+            request = {
+                'openid.mode': 'checkid_setup',
+                'openid.trust_root': 'http://localhost/',
+                'openid.return_to': 'http://localhost/',
+                'openid.identity': IDENTIFIER_SELECT,
+                'openid.ns.pape': pape.ns_uri,
+                'openid.pape.auth_policies': pape_policy,
             }
             openid_server = self.provider.server
             orequest = openid_server.decodeRequest(request)
             response = SuccessResponse(
                 self.endpoint, orequest.message,
-                signed_fields=['openid.pape.auth_policies',])
+                signed_fields=['openid.pape.auth_policies'])
             return response
-        Consumer.complete = mock_complete
+
+        patch.object(Consumer, 'complete', mock_complete)
 
         user = User.objects.create_user('testuser', 'test@example.com')
-        useropenid = UserOpenID(
+        UserOpenID.objects.create(
             user=user,
             claimed_id='http://example.com/identity',
             display_id='http://example.com/identity')
-        useropenid.save()
 
-        openid_req = {'openid_identifier': 'http://example.com/identity',
-               'next': '/getuser/'}
-        openid_resp =  {'nickname': 'testuser', 'fullname': 'Openid User',
-                 'email': 'test@example.com'}
-
-        openid_request = self._get_login_request(openid_req)
-        openid_response = self._get_login_response(openid_request, openid_req, openid_resp, use_pape=pape.AUTH_NONE)
+        openid_request = self._get_login_request(self.openid_req)
+        openid_response = self._get_login_response(
+            openid_request, self.openid_req, self.openid_resp,
+            use_pape=pape.AUTH_NONE)
 
         response_auth = openid_request.message.getArg(
             'http://specs.openid.net/extensions/pape/1.0',
@@ -583,193 +537,174 @@ class RelyingPartyTests(TestCase):
         )
         self.assertNotEqual(response_auth, preferred_auth)
 
-        # Status code should be 200, since we over-rode the login_failure handler
-        response = self.complete(openid_response)
-        self.assertEquals(200, response.status_code)
+        # Status code should be 200, since we over-rode the login_failure
+        with self.settings(OPENID_RENDER_FAILURE=mock_login_failure_handler):
+            response = self.complete(openid_response)
+        self.assertEqual(200, response.status_code)
         self.assertContains(response, 'Test Failure Override')
 
     def test_login_without_nickname(self):
-        settings.OPENID_CREATE_USERS = True
-
-        openid_req = {'openid_identifier': 'http://example.com/identity',
-               'next': '/getuser/'}
-        openid_resp =  {'nickname': '', 'fullname': 'Openid User',
-                 'email': 'foo@example.com'}
-        self._do_user_login(openid_req, openid_resp)
-        response = self.client.get('/getuser/')
+        self.openid_resp = {
+            'nickname': '', 'fullname': 'Openid User',
+            'email': 'foo@example.com'}
+        with self.settings(OPENID_CREATE_USERS=True):
+            self._do_user_login(self.openid_req, self.openid_resp)
+            response = self.client.get('/getuser/')
 
         # username defaults to 'openiduser'
-        self.assertEquals(response.content, 'openiduser')
+        self.assertEqual(response.content, 'openiduser')
 
         # The user's full name and email have been updated.
         user = User.objects.get(username=response.content)
-        self.assertEquals(user.first_name, 'Openid')
-        self.assertEquals(user.last_name, 'User')
-        self.assertEquals(user.email, 'foo@example.com')
+        self.assertEqual(user.first_name, 'Openid')
+        self.assertEqual(user.last_name, 'User')
+        self.assertEqual(user.email, 'foo@example.com')
 
     def test_login_without_nickname_with_email_suggestion(self):
-        settings.OPENID_CREATE_USERS = True
-        settings.OPENID_USE_EMAIL_FOR_USERNAME = True
-
-        openid_req = {'openid_identifier': 'http://example.com/identity',
-               'next': '/getuser/'}
-        openid_resp =  {'nickname': '', 'fullname': 'Openid User',
-                 'email': 'foo@example.com'}
-        self._do_user_login(openid_req, openid_resp)
-        response = self.client.get('/getuser/')
+        self.openid_resp = {
+            'nickname': '', 'fullname': 'Openid User',
+            'email': 'foo@example.com'}
+        with self.settings(
+                OPENID_CREATE_USERS=True, OPENID_USE_EMAIL_FOR_USERNAME=True):
+            self._do_user_login(self.openid_req, self.openid_resp)
+            response = self.client.get('/getuser/')
 
         # username defaults to a munged version of the email
-        self.assertEquals(response.content, 'fooexamplecom')
+        self.assertEqual(response.content, 'fooexamplecom')
 
     def test_login_duplicate_username_numbering(self):
-        settings.OPENID_FOLLOW_RENAMES = False
-        settings.OPENID_CREATE_USERS = True
-        settings.OPENID_UPDATE_DETAILS_FROM_SREG = True
         # Setup existing user who's name we're going to conflict with
-        user = User.objects.create_user('testuser', 'someone@example.com')
+        User.objects.create_user('testuser', 'someone@example.com')
 
         # identity url is for 'renameuser'
-        openid_req = {'openid_identifier': 'http://example.com/identity',
-               'next': '/getuser/'}
-        # but returned username is for 'testuser', which already exists for another identity
-        openid_resp =  {'nickname': 'testuser', 'fullname': 'Test User',
-                 'email': 'test@example.com'}
-        self._do_user_login(openid_req, openid_resp)
-        response = self.client.get('/getuser/')
+        # but returned username is for 'testuser', which already exists for
+        # another identity
+        with self.settings(
+                OPENID_FOLLOW_RENAMES=False, OPENID_CREATE_USERS=True,
+                OPENID_UPDATE_DETAILS_FROM_SREG=True):
+            self._do_user_login(self.openid_req, self.openid_resp)
+            response = self.client.get('/getuser/')
 
         # Since this username is already taken by someone else, we go through
         # the process of adding +i to it, and get testuser2.
-        self.assertEquals(response.content, 'testuser2')
+        self.assertEqual(response.content, 'testuser2')
 
     def test_login_duplicate_username_numbering_with_conflicts(self):
-        settings.OPENID_FOLLOW_RENAMES = False
-        settings.OPENID_CREATE_USERS = True
-        settings.OPENID_UPDATE_DETAILS_FROM_SREG = True
         # Setup existing user who's name we're going to conflict with
-        user = User.objects.create_user('testuser', 'someone@example.com')
-        user = User.objects.create_user('testuser3', 'someone@example.com')
+        User.objects.create_user('testuser', 'someone@example.com')
+        User.objects.create_user('testuser3', 'someone@example.com')
 
         # identity url is for 'renameuser'
-        openid_req = {'openid_identifier': 'http://example.com/identity',
-               'next': '/getuser/'}
-        # but returned username is for 'testuser', which already exists for another identity
-        openid_resp =  {'nickname': 'testuser', 'fullname': 'Test User',
-                 'email': 'test@example.com'}
-        self._do_user_login(openid_req, openid_resp)
-        response = self.client.get('/getuser/')
+        # but returned username is for 'testuser', which already exists for
+        # another identity
+        with self.settings(
+                OPENID_FOLLOW_RENAMES=False, OPENID_CREATE_USERS=True,
+                OPENID_UPDATE_DETAILS_FROM_SREG=True):
+            self._do_user_login(self.openid_req, self.openid_resp)
+            response = self.client.get('/getuser/')
 
         # Since this username is already taken by someone else, we go through
         # the process of adding +i to it starting with the count of users with
         # username starting with 'testuser', of which there are 2.  i should
         # start at 3, which already exists, so it should skip to 4.
-        self.assertEquals(response.content, 'testuser4')
+        self.assertEqual(response.content, 'testuser4')
 
     def test_login_duplicate_username_numbering_with_holes(self):
-        settings.OPENID_FOLLOW_RENAMES = False
-        settings.OPENID_CREATE_USERS = True
-        settings.OPENID_UPDATE_DETAILS_FROM_SREG = True
         # Setup existing user who's name we're going to conflict with
-        user = User.objects.create_user('testuser', 'someone@example.com')
-        user = User.objects.create_user('testuser1', 'someone@example.com')
-        user = User.objects.create_user('testuser6', 'someone@example.com')
-        user = User.objects.create_user('testuser7', 'someone@example.com')
-        user = User.objects.create_user('testuser8', 'someone@example.com')
+        User.objects.create_user('testuser', 'someone@example.com')
+        User.objects.create_user('testuser1', 'someone@example.com')
+        User.objects.create_user('testuser6', 'someone@example.com')
+        User.objects.create_user('testuser7', 'someone@example.com')
+        User.objects.create_user('testuser8', 'someone@example.com')
 
         # identity url is for 'renameuser'
-        openid_req = {'openid_identifier': 'http://example.com/identity',
-               'next': '/getuser/'}
-        # but returned username is for 'testuser', which already exists for another identity
-        openid_resp =  {'nickname': 'testuser', 'fullname': 'Test User',
-                 'email': 'test@example.com'}
-        self._do_user_login(openid_req, openid_resp)
-        response = self.client.get('/getuser/')
+        # but returned username is for 'testuser', which already exists for
+        # another identity
+        with self.settings(
+                OPENID_FOLLOW_RENAMES=False, OPENID_CREATE_USERS=True,
+                OPENID_UPDATE_DETAILS_FROM_SREG=True):
+            self._do_user_login(self.openid_req, self.openid_resp)
+            response = self.client.get('/getuser/')
 
         # Since this username is already taken by someone else, we go through
         # the process of adding +i to it starting with the count of users with
         # username starting with 'testuser', of which there are 5.  i should
         # start at 6, and increment until it reaches 9.
-        self.assertEquals(response.content, 'testuser9')
+        self.assertEqual(response.content, 'testuser9')
 
-    def test_login_duplicate_username_numbering_with_nonsequential_matches(self):
-        settings.OPENID_FOLLOW_RENAMES = False
-        settings.OPENID_CREATE_USERS = True
-        settings.OPENID_UPDATE_DETAILS_FROM_SREG = True
+    def test_login_duplicate_username_numbering_with_nonsequential_matches(
+            self):
         # Setup existing user who's name we're going to conflict with
-        user = User.objects.create_user('testuser', 'someone@example.com')
-        user = User.objects.create_user('testuserfoo', 'someone@example.com')
+        User.objects.create_user('testuser', 'someone@example.com')
+        User.objects.create_user('testuserfoo', 'someone@example.com')
 
         # identity url is for 'renameuser'
-        openid_req = {'openid_identifier': 'http://example.com/identity',
-               'next': '/getuser/'}
-        # but returned username is for 'testuser', which already exists for another identity
-        openid_resp =  {'nickname': 'testuser', 'fullname': 'Test User',
-                 'email': 'test@example.com'}
-        self._do_user_login(openid_req, openid_resp)
-        response = self.client.get('/getuser/')
+        # but returned username is for 'testuser', which already exists for
+        # another identity
+        with self.settings(
+                OPENID_FOLLOW_RENAMES=False, OPENID_CREATE_USERS=True,
+                OPENID_UPDATE_DETAILS_FROM_SREG=True):
+            self._do_user_login(self.openid_req, self.openid_resp)
+            response = self.client.get('/getuser/')
 
         # Since this username is already taken by someone else, we go through
         # the process of adding +i to it starting with the count of users with
         # username starting with 'testuser', of which there are 2.  i should
         # start at 3, which will be available.
-        self.assertEquals(response.content, 'testuser3')
+        self.assertEqual(response.content, 'testuser3')
 
     def test_login_follow_rename(self):
-        settings.OPENID_FOLLOW_RENAMES = True
-        settings.OPENID_UPDATE_DETAILS_FROM_SREG = True
         user = User.objects.create_user('testuser', 'someone@example.com')
-        useropenid = UserOpenID(
+        UserOpenID.objects.create(
             user=user,
             claimed_id='http://example.com/identity',
             display_id='http://example.com/identity')
-        useropenid.save()
 
-        openid_req = {'openid_identifier': 'http://example.com/identity',
-               'next': '/getuser/'}
-        openid_resp =  {'nickname': 'someuser', 'fullname': 'Some User',
-                 'email': 'foo@example.com'}
-        self._do_user_login(openid_req, openid_resp)
-        response = self.client.get('/getuser/')
+        self.openid_resp = {
+            'nickname': 'someuser', 'fullname': 'Some User',
+            'email': 'foo@example.com'}
+        with self.settings(
+                OPENID_FOLLOW_RENAMES=True,
+                OPENID_UPDATE_DETAILS_FROM_SREG=True):
+            self._do_user_login(self.openid_req, self.openid_resp)
+            response = self.client.get('/getuser/')
 
         # If OPENID_FOLLOW_RENAMES, they are logged in as
         # someuser (the passed in nickname has changed the username)
-        self.assertEquals(response.content, 'someuser')
+        self.assertEqual(response.content, 'someuser')
 
         # The user's full name and email have been updated.
         user = User.objects.get(username=response.content)
-        self.assertEquals(user.first_name, 'Some')
-        self.assertEquals(user.last_name, 'User')
-        self.assertEquals(user.email, 'foo@example.com')
+        self.assertEqual(user.first_name, 'Some')
+        self.assertEqual(user.last_name, 'User')
+        self.assertEqual(user.email, 'foo@example.com')
 
     def test_login_follow_rename_without_nickname_change(self):
-        settings.OPENID_FOLLOW_RENAMES = True
-        settings.OPENID_UPDATE_DETAILS_FROM_SREG = True
-        settings.OPENID_STRICT_USERNAMES = True
         user = User.objects.create_user('testuser', 'someone@example.com')
-        useropenid = UserOpenID(
+        UserOpenID.objects.create(
             user=user,
             claimed_id='http://example.com/identity',
             display_id='http://example.com/identity')
-        useropenid.save()
 
-        openid_req = {'openid_identifier': 'http://example.com/identity',
-               'next': '/getuser/'}
-        openid_resp =  {'nickname': 'testuser', 'fullname': 'Some User',
-                 'email': 'foo@example.com'}
-        self._do_user_login(openid_req, openid_resp)
-        response = self.client.get('/getuser/')
+        self.openid_resp = {
+            'nickname': 'testuser', 'fullname': 'Some User',
+            'email': 'foo@example.com'}
+        with self.settings(
+                OPENID_FOLLOW_RENAMES=True, OPENID_STRICT_USERNAMES=True,
+                OPENID_UPDATE_DETAILS_FROM_SREG=True):
+            self._do_user_login(self.openid_req, self.openid_resp)
+            response = self.client.get('/getuser/')
 
         # Username should not have changed
-        self.assertEquals(response.content, 'testuser')
+        self.assertEqual(response.content, 'testuser')
 
         # The user's full name and email have been updated.
         user = User.objects.get(username=response.content)
-        self.assertEquals(user.first_name, 'Some')
-        self.assertEquals(user.last_name, 'User')
-        self.assertEquals(user.email, 'foo@example.com')
+        self.assertEqual(user.first_name, 'Some')
+        self.assertEqual(user.last_name, 'User')
+        self.assertEqual(user.email, 'foo@example.com')
 
     def test_login_follow_rename_conflict(self):
-        settings.OPENID_FOLLOW_RENAMES = True
-        settings.OPENID_UPDATE_DETAILS_FROM_SREG = True
         # Setup existing user who's name we're going to switch to
         user = User.objects.create_user('testuser', 'someone@example.com')
         UserOpenID.objects.get_or_create(
@@ -778,35 +713,37 @@ class RelyingPartyTests(TestCase):
             display_id='http://example.com/existing_identity')
 
         # Setup user who is going to try to change username to 'testuser'
-        renamed_user = User.objects.create_user('renameuser', 'someone@example.com')
+        renamed_user = User.objects.create_user(
+            'renameuser', 'someone@example.com')
         UserOpenID.objects.get_or_create(
             user=renamed_user,
             claimed_id='http://example.com/identity',
             display_id='http://example.com/identity')
 
         # identity url is for 'renameuser'
-        openid_req = {'openid_identifier': 'http://example.com/identity',
-               'next': '/getuser/'}
-        # but returned username is for 'testuser', which already exists for another identity
-        openid_resp =  {'nickname': 'testuser', 'fullname': 'Rename User',
-                 'email': 'rename@example.com'}
-        self._do_user_login(openid_req, openid_resp)
-        response = self.client.get('/getuser/')
+        # but returned username is for 'testuser', which already exists for
+        # another identity
+        self.openid_resp = {
+            'nickname': 'testuser', 'fullname': 'Rename User',
+            'email': 'rename@example.com'}
+        with self.settings(
+                OPENID_FOLLOW_RENAMES=True,
+                OPENID_UPDATE_DETAILS_FROM_SREG=True):
+            self._do_user_login(self.openid_req, self.openid_resp)
+            response = self.client.get('/getuser/')
 
         # If OPENID_FOLLOW_RENAMES, attempt to change username to 'testuser'
-        # but since that username is already taken by someone else, we go through
-        # the process of adding +i to it, and get testuser2.
-        self.assertEquals(response.content, 'testuser2')
+        # but since that username is already taken by someone else, we go
+        # through the process of adding +i to it, and get testuser2.
+        self.assertEqual(response.content, 'testuser2')
 
         # The user's full name and email have been updated.
         user = User.objects.get(username=response.content)
-        self.assertEquals(user.first_name, 'Rename')
-        self.assertEquals(user.last_name, 'User')
-        self.assertEquals(user.email, 'rename@example.com')
+        self.assertEqual(user.first_name, 'Rename')
+        self.assertEqual(user.last_name, 'User')
+        self.assertEqual(user.email, 'rename@example.com')
 
     def test_login_follow_rename_false_onlyonce(self):
-        settings.OPENID_FOLLOW_RENAMES = True
-        settings.OPENID_UPDATE_DETAILS_FROM_SREG = True
         # Setup existing user who's name we're going to switch to
         user = User.objects.create_user('testuser', 'someone@example.com')
         UserOpenID.objects.get_or_create(
@@ -815,38 +752,40 @@ class RelyingPartyTests(TestCase):
             display_id='http://example.com/existing_identity')
 
         # Setup user who is going to try to change username to 'testuser'
-        renamed_user = User.objects.create_user('testuser2000eight', 'someone@example.com')
+        renamed_user = User.objects.create_user(
+            'testuser2000eight', 'someone@example.com')
         UserOpenID.objects.get_or_create(
             user=renamed_user,
             claimed_id='http://example.com/identity',
             display_id='http://example.com/identity')
 
         # identity url is for 'testuser2000eight'
-        openid_req = {'openid_identifier': 'http://example.com/identity',
-               'next': '/getuser/'}
-        # but returned username is for 'testuser', which already exists for another identity
-        openid_resp =  {'nickname': 'testuser2', 'fullname': 'Rename User',
-                 'email': 'rename@example.com'}
-        self._do_user_login(openid_req, openid_resp)
-        response = self.client.get('/getuser/')
+        # but returned username is for 'testuser', which already exists for
+        # another identity
+        self.openid_resp = {
+            'nickname': 'testuser2', 'fullname': 'Rename User',
+            'email': 'rename@example.com'}
+        with self.settings(
+                OPENID_FOLLOW_RENAMES=True,
+                OPENID_UPDATE_DETAILS_FROM_SREG=True):
+            self._do_user_login(self.openid_req, self.openid_resp)
+            response = self.client.get('/getuser/')
 
         # If OPENID_FOLLOW_RENAMES, attempt to change username to 'testuser'
-        # but since that username is already taken by someone else, we go through
-        # the process of adding +i to it.  Even though it looks like the username
-        # follows the nickname+i scheme, it has non-numbers in the suffix, so
-        # it's not an auto-generated one.  The regular process of renaming to
-        # 'testuser' has a conflict, so we get +2 at the end.
-        self.assertEquals(response.content, 'testuser2')
+        # but since that username is already taken by someone else, we go
+        # through the process of adding +i to it.  Even though it looks like
+        # the username follows the nickname+i scheme, it has non-numbers in the
+        # suffix, so it's not an auto-generated one.  The regular process of
+        # renaming to 'testuser' has a conflict, so we get +2 at the end.
+        self.assertEqual(response.content, 'testuser2')
 
         # The user's full name and email have been updated.
         user = User.objects.get(username=response.content)
-        self.assertEquals(user.first_name, 'Rename')
-        self.assertEquals(user.last_name, 'User')
-        self.assertEquals(user.email, 'rename@example.com')
+        self.assertEqual(user.first_name, 'Rename')
+        self.assertEqual(user.last_name, 'User')
+        self.assertEqual(user.email, 'rename@example.com')
 
     def test_login_follow_rename_conflict_onlyonce(self):
-        settings.OPENID_FOLLOW_RENAMES = True
-        settings.OPENID_UPDATE_DETAILS_FROM_SREG = True
         # Setup existing user who's name we're going to switch to
         user = User.objects.create_user('testuser', 'someone@example.com')
         UserOpenID.objects.get_or_create(
@@ -855,36 +794,38 @@ class RelyingPartyTests(TestCase):
             display_id='http://example.com/existing_identity')
 
         # Setup user who is going to try to change username to 'testuser'
-        renamed_user = User.objects.create_user('testuser2000', 'someone@example.com')
+        renamed_user = User.objects.create_user(
+            'testuser2000', 'someone@example.com')
         UserOpenID.objects.get_or_create(
             user=renamed_user,
             claimed_id='http://example.com/identity',
             display_id='http://example.com/identity')
 
         # identity url is for 'testuser2000'
-        openid_req = {'openid_identifier': 'http://example.com/identity',
-               'next': '/getuser/'}
-        # but returned username is for 'testuser', which already exists for another identity
-        openid_resp =  {'nickname': 'testuser', 'fullname': 'Rename User',
-                 'email': 'rename@example.com'}
-        self._do_user_login(openid_req, openid_resp)
-        response = self.client.get('/getuser/')
+        # but returned username is for 'testuser', which already exists for
+        # another identity
+        self.openid_resp = {
+            'nickname': 'testuser', 'fullname': 'Rename User',
+            'email': 'rename@example.com'}
+        with self.settings(
+                OPENID_FOLLOW_RENAMES=True,
+                OPENID_UPDATE_DETAILS_FROM_SREG=True):
+            self._do_user_login(self.openid_req, self.openid_resp)
+            response = self.client.get('/getuser/')
 
         # If OPENID_FOLLOW_RENAMES, attempt to change username to 'testuser'
-        # but since that username is already taken by someone else, we go through
-        # the process of adding +i to it.  Since the user for this identity url
-        # already has a name matching that pattern, check if first.
-        self.assertEquals(response.content, 'testuser2000')
+        # but since that username is already taken by someone else, we go
+        # through the process of adding +i to it.  Since the user for this
+        # identity url already has a name matching that pattern, check if first
+        self.assertEqual(response.content, 'testuser2000')
 
         # The user's full name and email have been updated.
         user = User.objects.get(username=response.content)
-        self.assertEquals(user.first_name, 'Rename')
-        self.assertEquals(user.last_name, 'User')
-        self.assertEquals(user.email, 'rename@example.com')
+        self.assertEqual(user.first_name, 'Rename')
+        self.assertEqual(user.last_name, 'User')
+        self.assertEqual(user.email, 'rename@example.com')
 
     def test_login_follow_rename_false_conflict(self):
-        settings.OPENID_FOLLOW_RENAMES = True
-        settings.OPENID_UPDATE_DETAILS_FROM_SREG = True
         # Setup existing user who's username matches the name+i pattern
         user = User.objects.create_user('testuser2', 'someone@example.com')
         UserOpenID.objects.get_or_create(
@@ -893,34 +834,33 @@ class RelyingPartyTests(TestCase):
             display_id='http://example.com/identity')
 
         # identity url is for 'testuser2'
-        openid_req = {'openid_identifier': 'http://example.com/identity',
-               'next': '/getuser/'}
         # but returned username is for 'testuser', which looks like we've done
         # a username+1 for them already, but 'testuser' isn't actually taken
-        openid_resp =  {'nickname': 'testuser', 'fullname': 'Same User',
-                 'email': 'same@example.com'}
-        self._do_user_login(openid_req, openid_resp)
-        response = self.client.get('/getuser/')
+        self.openid_resp = {
+            'nickname': 'testuser', 'fullname': 'Same User',
+            'email': 'same@example.com'}
+        with self.settings(
+                OPENID_FOLLOW_RENAMES=True,
+                OPENID_UPDATE_DETAILS_FROM_SREG=True):
+            self._do_user_login(self.openid_req, self.openid_resp)
+            response = self.client.get('/getuser/')
 
         # If OPENID_FOLLOW_RENAMES, username should be changed to 'testuser'
         # because it wasn't currently taken
-        self.assertEquals(response.content, 'testuser')
+        self.assertEqual(response.content, 'testuser')
 
         # The user's full name and email have been updated.
         user = User.objects.get(username=response.content)
-        self.assertEquals(user.first_name, 'Same')
-        self.assertEquals(user.last_name, 'User')
-        self.assertEquals(user.email, 'same@example.com')
+        self.assertEqual(user.first_name, 'Same')
+        self.assertEqual(user.last_name, 'User')
+        self.assertEqual(user.email, 'same@example.com')
 
+    @override_settings(
+        OPENID_CREATE_USERS=True, OPENID_STRICT_USERNAMES=True,
+        OPENID_SREG_REQUIRED_FIELDS=[])
     def test_strict_username_no_nickname(self):
-        settings.OPENID_CREATE_USERS = True
-        settings.OPENID_STRICT_USERNAMES = True
-        settings.OPENID_SREG_REQUIRED_FIELDS = []
-
         # Posting in an identity URL begins the authentication request:
-        response = self.client.post('/openid/login/',
-            {'openid_identifier': 'http://example.com/identity',
-             'next': '/getuser/'})
+        response = self.client.post(self.login_url, self.openid_req)
         self.assertContains(response, 'OpenID transaction in progress')
 
         # Complete the request, passing back some simple registration
@@ -929,35 +869,36 @@ class RelyingPartyTests(TestCase):
         sreg_request = sreg.SRegRequest.fromOpenIDRequest(openid_request)
         openid_response = openid_request.answer(True)
         sreg_response = sreg.SRegResponse.extractResponse(
-            sreg_request, {'nickname': '', # No nickname
+            sreg_request, {'nickname': '',  # No nickname
                            'fullname': 'Some User',
                            'email': 'foo@example.com'})
         openid_response.addExtension(sreg_response)
         response = self.complete(openid_response)
 
         # Status code should be 403: Forbidden
-        self.assertEquals(403, response.status_code)
-        self.assertContains(response, '<h1>OpenID failed</h1>', status_code=403)
-        self.assertContains(response, "An attribute required for logging in was not returned "
-            "(nickname)", status_code=403)
+        self.assertEqual(403, response.status_code)
+        self.assertContains(
+            response, '<h1>OpenID failed</h1>', status_code=403)
+        self.assertContains(
+            response,
+            "An attribute required for logging in was not returned (nickname)",
+            status_code=403)
 
+    @override_settings(
+        OPENID_CREATE_USERS=True, OPENID_STRICT_USERNAMES=True,
+        OPENID_SREG_REQUIRED_FIELDS=[])
     def test_strict_username_no_nickname_override(self):
-        settings.OPENID_CREATE_USERS = True
-        settings.OPENID_STRICT_USERNAMES = True
-        settings.OPENID_SREG_REQUIRED_FIELDS = []
-
         # Override the login_failure handler
         def mock_login_failure_handler(request, message, status=403,
                                        template_name=None,
                                        exception=None):
-           self.assertTrue(isinstance(exception, (RequiredAttributeNotReturned, MissingUsernameViolation)))
-           return HttpResponse('Test Failure Override', status=200)
-        settings.OPENID_RENDER_FAILURE = mock_login_failure_handler
+            self.assertIsInstance(
+                exception,
+                (RequiredAttributeNotReturned, MissingUsernameViolation))
+            return HttpResponse('Test Failure Override', status=200)
 
         # Posting in an identity URL begins the authentication request:
-        response = self.client.post('/openid/login/',
-            {'openid_identifier': 'http://example.com/identity',
-             'next': '/getuser/'})
+        response = self.client.post(self.login_url, self.openid_req)
         self.assertContains(response, 'OpenID transaction in progress')
 
         # Complete the request, passing back some simple registration
@@ -966,31 +907,27 @@ class RelyingPartyTests(TestCase):
         sreg_request = sreg.SRegRequest.fromOpenIDRequest(openid_request)
         openid_response = openid_request.answer(True)
         sreg_response = sreg.SRegResponse.extractResponse(
-            sreg_request, {'nickname': '', # No nickname
+            sreg_request, {'nickname': '',  # No nickname
                            'fullname': 'Some User',
                            'email': 'foo@example.com'})
         openid_response.addExtension(sreg_response)
-        response = self.complete(openid_response)
+        with self.settings(OPENID_RENDER_FAILURE=mock_login_failure_handler):
+            response = self.complete(openid_response)
 
-        # Status code should be 200, since we over-rode the login_failure handler
-        self.assertEquals(200, response.status_code)
+        # Status code should be 200, since we over-rode the login_failure
+        self.assertEqual(200, response.status_code)
         self.assertContains(response, 'Test Failure Override')
 
     def test_strict_username_duplicate_user(self):
-        settings.OPENID_CREATE_USERS = True
-        settings.OPENID_STRICT_USERNAMES = True
         # Create a user with the same name as we'll pass back via sreg.
         user = User.objects.create_user('someuser', 'someone@example.com')
-        useropenid = UserOpenID(
+        UserOpenID.objects.create(
             user=user,
             claimed_id='http://example.com/different_identity',
             display_id='http://example.com/different_identity')
-        useropenid.save()
 
         # Posting in an identity URL begins the authentication request:
-        response = self.client.post('/openid/login/',
-            {'openid_identifier': 'http://example.com/identity',
-             'next': '/getuser/'})
+        response = self.client.post(self.login_url, self.openid_req)
         self.assertContains(response, 'OpenID transaction in progress')
 
         # Complete the request, passing back some simple registration
@@ -1002,40 +939,37 @@ class RelyingPartyTests(TestCase):
             sreg_request, {'nickname': 'someuser', 'fullname': 'Some User',
                            'email': 'foo@example.com'})
         openid_response.addExtension(sreg_response)
-        response = self.complete(openid_response)
+        with self.settings(
+                OPENID_CREATE_USERS=True, OPENID_STRICT_USERNAMES=True):
+            response = self.complete(openid_response)
 
         # Status code should be 403: Forbidden
-        self.assertEquals(403, response.status_code)
-        self.assertContains(response, '<h1>OpenID failed</h1>', status_code=403)
-        self.assertContains(response,
+        self.assertEqual(403, response.status_code)
+        self.assertContains(
+            response, '<h1>OpenID failed</h1>', status_code=403)
+        self.assertContains(
+            response,
             "The username (someuser) with which you tried to log in is "
             "already in use for a different account.",
             status_code=403)
 
     def test_strict_username_duplicate_user_override(self):
-        settings.OPENID_CREATE_USERS = True
-        settings.OPENID_STRICT_USERNAMES = True
-
         # Override the login_failure handler
         def mock_login_failure_handler(request, message, status=403,
                                        template_name=None,
                                        exception=None):
-           self.assertTrue(isinstance(exception, DuplicateUsernameViolation))
-           return HttpResponse('Test Failure Override', status=200)
-        settings.OPENID_RENDER_FAILURE = mock_login_failure_handler
+            self.assertIsInstance(exception, DuplicateUsernameViolation)
+            return HttpResponse('Test Failure Override', status=200)
 
         # Create a user with the same name as we'll pass back via sreg.
         user = User.objects.create_user('someuser', 'someone@example.com')
-        useropenid = UserOpenID(
+        UserOpenID.objects.create(
             user=user,
             claimed_id='http://example.com/different_identity',
             display_id='http://example.com/different_identity')
-        useropenid.save()
 
         # Posting in an identity URL begins the authentication request:
-        response = self.client.post('/openid/login/',
-            {'openid_identifier': 'http://example.com/identity',
-             'next': '/getuser/'})
+        response = self.client.post(self.login_url, self.openid_req)
         self.assertContains(response, 'OpenID transaction in progress')
 
         # Complete the request, passing back some simple registration
@@ -1047,21 +981,18 @@ class RelyingPartyTests(TestCase):
             sreg_request, {'nickname': 'someuser', 'fullname': 'Some User',
                            'email': 'foo@example.com'})
         openid_response.addExtension(sreg_response)
-        response = self.complete(openid_response)
+        with self.settings(
+                OPENID_RENDER_FAILURE=mock_login_failure_handler,
+                OPENID_CREATE_USERS=True, OPENID_STRICT_USERNAMES=True):
+            response = self.complete(openid_response)
 
-        # Status code should be 200, since we over-rode the login_failure handler
-        self.assertEquals(200, response.status_code)
+        # Status code should be 200, since we over-rode the login_failure
+        self.assertEqual(200, response.status_code)
         self.assertContains(response, 'Test Failure Override')
 
     def test_login_requires_sreg_required_fields(self):
-        # If any required attributes are not included in the response,
-        # we fail with a forbidden.
-        settings.OPENID_CREATE_USERS = True
-        settings.OPENID_SREG_REQUIRED_FIELDS = ('email', 'language')
         # Posting in an identity URL begins the authentication request:
-        response = self.client.post('/openid/login/',
-            {'openid_identifier': 'http://example.com/identity',
-             'next': '/getuser/'})
+        response = self.client.post(self.login_url, self.openid_req)
         self.assertContains(response, 'OpenID transaction in progress')
 
         # Complete the request, passing back some simple registration
@@ -1074,52 +1005,52 @@ class RelyingPartyTests(TestCase):
                            'fullname': 'Some User',
                            'email': 'foo@example.com'})
         openid_response.addExtension(sreg_response)
-        response = self.complete(openid_response)
+        # If any required attributes are not included in the response,
+        # we fail with a forbidden.
+        with self.settings(
+                OPENID_CREATE_USERS=True,
+                OPENID_SREG_REQUIRED_FIELDS=('email', 'language')):
+            response = self.complete(openid_response)
 
         # Status code should be 403: Forbidden as we didn't include
         # a required field - language.
-        self.assertContains(response,
-            "An attribute required for logging in was not returned "
-            "(language)", status_code=403)
+        self.assertContains(
+            response,
+            "An attribute required for logging in was not returned (language)",
+            status_code=403)
 
     def test_login_update_details(self):
-        settings.OPENID_UPDATE_DETAILS_FROM_SREG = True
         user = User.objects.create_user('testuser', 'someone@example.com')
-        useropenid = UserOpenID(
+        UserOpenID.objects.create(
             user=user,
             claimed_id='http://example.com/identity',
             display_id='http://example.com/identity')
-        useropenid.save()
 
-        openid_req = {'openid_identifier': 'http://example.com/identity',
-               'next': '/getuser/'}
-        openid_resp =  {'nickname': 'testuser', 'fullname': 'Some User',
-                 'email': 'foo@example.com'}
-        self._do_user_login(openid_req, openid_resp)
-        response = self.client.get('/getuser/')
+        self.openid_resp = {
+            'nickname': 'testuser', 'fullname': 'Some User',
+            'email': 'foo@example.com'}
+        with self.settings(OPENID_UPDATE_DETAILS_FROM_SREG=True):
+            self._do_user_login(self.openid_req, self.openid_resp)
+            response = self.client.get('/getuser/')
 
-        self.assertEquals(response.content, 'testuser')
+        self.assertEqual(response.content, 'testuser')
 
         # The user's full name and email have been updated.
         user = User.objects.get(username=response.content)
-        self.assertEquals(user.first_name, 'Some')
-        self.assertEquals(user.last_name, 'User')
-        self.assertEquals(user.email, 'foo@example.com')
+        self.assertEqual(user.first_name, 'Some')
+        self.assertEqual(user.last_name, 'User')
+        self.assertEqual(user.email, 'foo@example.com')
 
     def test_login_uses_sreg_extra_fields(self):
-        # The configurable sreg attributes are used in the request.
-        settings.OPENID_SREG_EXTRA_FIELDS = ('language',)
         user = User.objects.create_user('testuser', 'someone@example.com')
-        useropenid = UserOpenID(
+        UserOpenID.objects.create(
             user=user,
             claimed_id='http://example.com/identity',
             display_id='http://example.com/identity')
-        useropenid.save()
 
         # Posting in an identity URL begins the authentication request:
-        response = self.client.post('/openid/login/',
-            {'openid_identifier': 'http://example.com/identity',
-             'next': '/getuser/'})
+        with self.settings(OPENID_SREG_EXTRA_FIELDS=('language',)):
+            response = self.client.post(self.login_url, self.openid_req)
 
         openid_request = self.provider.parseFormPost(response.content)
         sreg_request = sreg.SRegRequest.fromOpenIDRequest(openid_request)
@@ -1128,18 +1059,15 @@ class RelyingPartyTests(TestCase):
 
     def test_login_uses_sreg_required_fields(self):
         # The configurable sreg attributes are used in the request.
-        settings.OPENID_SREG_REQUIRED_FIELDS = ('email', 'language')
         user = User.objects.create_user('testuser', 'someone@example.com')
-        useropenid = UserOpenID(
+        UserOpenID.objects.create(
             user=user,
             claimed_id='http://example.com/identity',
             display_id='http://example.com/identity')
-        useropenid.save()
 
         # Posting in an identity URL begins the authentication request:
-        response = self.client.post('/openid/login/',
-            {'openid_identifier': 'http://example.com/identity',
-             'next': '/getuser/'})
+        with self.settings(OPENID_SREG_REQUIRED_FIELDS=('email', 'language')):
+            response = self.client.post(self.login_url, self.openid_req)
 
         openid_request = self.provider.parseFormPost(response.content)
         sreg_request = sreg.SRegRequest.fromOpenIDRequest(openid_request)
@@ -1149,20 +1077,16 @@ class RelyingPartyTests(TestCase):
 
     def check_login_attribute_exchange(self, validation_type, is_verified,
                                        request_account_verified=True):
-        settings.OPENID_UPDATE_DETAILS_FROM_SREG = True
         user = User.objects.create_user('testuser', 'someone@example.com')
-        useropenid = UserOpenID(
+        UserOpenID.objects.create(
             user=user,
             claimed_id='http://example.com/identity',
             display_id='http://example.com/identity')
-        useropenid.save()
 
         # Configure the provider to advertise attribute exchange
         # protocol and start the authentication process:
         self.provider.type_uris.append('http://openid.net/srv/ax/1.0')
-        response = self.client.post('/openid/login/',
-            {'openid_identifier': 'http://example.com/identity',
-             'next': '/getuser/'})
+        response = self.client.post(self.login_url, self.openid_req)
         self.assertContains(response, 'OpenID transaction in progress')
 
         # The resulting OpenID request uses the Attribute Exchange
@@ -1173,28 +1097,20 @@ class RelyingPartyTests(TestCase):
         self.assertEqual(sreg_request.optional, [])
 
         fetch_request = ax.FetchRequest.fromOpenIDRequest(openid_request)
-        self.assertTrue(fetch_request.has_key(
-                'http://axschema.org/contact/email'))
-        self.assertTrue(fetch_request.has_key(
-                'http://axschema.org/namePerson'))
-        self.assertTrue(fetch_request.has_key(
-                'http://axschema.org/namePerson/first'))
-        self.assertTrue(fetch_request.has_key(
-                'http://axschema.org/namePerson/last'))
-        self.assertTrue(fetch_request.has_key(
-                'http://axschema.org/namePerson/friendly'))
+        self.assertIn('http://axschema.org/contact/email', fetch_request)
+        self.assertIn('http://axschema.org/namePerson', fetch_request)
+        self.assertIn('http://axschema.org/namePerson/first', fetch_request)
+        self.assertIn('http://axschema.org/namePerson/last', fetch_request)
+        self.assertIn('http://axschema.org/namePerson/friendly', fetch_request)
         # myOpenID compatibilty attributes:
-        self.assertTrue(fetch_request.has_key(
-                'http://schema.openid.net/contact/email'))
-        self.assertTrue(fetch_request.has_key(
-                'http://schema.openid.net/namePerson'))
-        self.assertTrue(fetch_request.has_key(
-                'http://schema.openid.net/namePerson/friendly'))
+        self.assertIn('http://schema.openid.net/contact/email', fetch_request)
+        self.assertIn('http://schema.openid.net/namePerson', fetch_request)
+        self.assertIn(
+            'http://schema.openid.net/namePerson/friendly', fetch_request)
+
         # Account verification:
-        self.assertEqual(
-            fetch_request.has_key(
-                'http://ns.login.ubuntu.com/2013/validation/account'),
-            request_account_verified)
+        validation = 'http://ns.login.ubuntu.com/2013/validation/account'
+        self.assertEqual(validation in fetch_request, request_account_verified)
 
         # Build up a response including AX data.
         openid_response = openid_request.answer(True)
@@ -1212,36 +1128,40 @@ class RelyingPartyTests(TestCase):
                 'http://ns.login.ubuntu.com/2013/validation/account',
                 validation_type)
         openid_response.addExtension(fetch_response)
-        response = self.complete(openid_response)
+        with self.settings(OPENID_UPDATE_DETAILS_FROM_SREG=True):
+            response = self.complete(openid_response)
         self.assertRedirects(response, 'http://testserver/getuser/')
 
         # And they are now logged in as testuser (the passed in
         # nickname has not caused the username to change), because
-        # settings.OPENID_FOLLOW_RENAMES is False.
+        assert not settings.OPENID_FOLLOW_RENAMES, (
+            'OPENID_FOLLOW_RENAMES must be False')
         response = self.client.get('/getuser/')
-        self.assertEquals(response.content, 'testuser')
+        self.assertEqual(response.content, 'testuser')
 
         # The user's full name and email have been updated.
         user = User.objects.get(username='testuser')
-        self.assertEquals(user.first_name, 'Firstname')
-        self.assertEquals(user.last_name, 'Lastname')
-        self.assertEquals(user.email, 'foo@example.com')
+        self.assertEqual(user.first_name, 'Firstname')
+        self.assertEqual(user.last_name, 'Lastname')
+        self.assertEqual(user.email, 'foo@example.com')
         # So have the user's permissions
         self.assertEqual(
             user.has_perm('django_openid_auth.account_verified'), is_verified)
 
     def test_login_attribute_exchange_with_verification(self):
-        settings.OPENID_VALID_VERIFICATION_SCHEMES = {
+        schemes = {
             self.provider.endpoint_url: ('token_via_email',),
         }
-        self.check_login_attribute_exchange('token_via_email',
-                                            is_verified=True)
+        with self.settings(OPENID_VALID_VERIFICATION_SCHEMES=schemes):
+            self.check_login_attribute_exchange('token_via_email',
+                                                is_verified=True)
 
     def test_login_attribute_exchange_without_verification(self):
-        settings.OPENID_VALID_VERIFICATION_SCHEMES = {
+        schemes = {
             self.provider.endpoint_url: ('token_via_email',),
         }
-        self.check_login_attribute_exchange(None, is_verified=False)
+        with self.settings(OPENID_VALID_VERIFICATION_SCHEMES=schemes):
+            self.check_login_attribute_exchange(None, is_verified=False)
 
     def test_login_attribute_exchange_without_account_verified(self):
         # don't request account_verified attribute in AX request (as there are
@@ -1252,32 +1172,32 @@ class RelyingPartyTests(TestCase):
                                             request_account_verified=False)
 
     def test_login_attribute_exchange_unrecognised_verification(self):
-        settings.OPENID_VALID_VERIFICATION_SCHEMES = {
+        schemes = {
             self.provider.endpoint_url: ('token_via_email',),
         }
-        self.check_login_attribute_exchange('unrecognised_scheme',
-                                            is_verified=False)
+        with self.settings(OPENID_VALID_VERIFICATION_SCHEMES=schemes):
+            self.check_login_attribute_exchange('unrecognised_scheme',
+                                                is_verified=False)
 
     def test_login_attribute_exchange_different_default_verification(self):
-        settings.OPENID_VALID_VERIFICATION_SCHEMES = {
+        schemes = {
             None: ('token_via_email', 'sms'),
             'http://otherprovider/': ('unrecognised_scheme',),
         }
-        self.check_login_attribute_exchange('unrecognised_scheme',
-                                            is_verified=False)
+        with self.settings(OPENID_VALID_VERIFICATION_SCHEMES=schemes):
+            self.check_login_attribute_exchange('unrecognised_scheme',
+                                                is_verified=False)
 
     def test_login_attribute_exchange_matched_default_verification(self):
-        settings.OPENID_VALID_VERIFICATION_SCHEMES = {
+        schemes = {
             None: ('token_via_email',),
             'http://otherprovider/': ('unrecognised_scheme',),
         }
-        self.check_login_attribute_exchange('token_via_email',
-                                            is_verified=True)
+        with self.settings(OPENID_VALID_VERIFICATION_SCHEMES=schemes):
+            self.check_login_attribute_exchange('token_via_email',
+                                                is_verified=True)
 
     def test_login_teams(self):
-        settings.OPENID_LAUNCHPAD_TEAMS_MAPPING_AUTO = False
-        settings.OPENID_LAUNCHPAD_TEAMS_MAPPING = {'teamname': 'groupname',
-                                                   'otherteam': 'othergroup'}
         user = User.objects.create_user('testuser', 'someone@example.com')
         group = Group(name='groupname')
         group.save()
@@ -1291,16 +1211,13 @@ class RelyingPartyTests(TestCase):
             Permission.objects.get(codename='add_useropenid'))
         user.groups.add(ogroup)
         user.save()
-        useropenid = UserOpenID(
+        UserOpenID.objects.create(
             user=user,
             claimed_id='http://example.com/identity',
             display_id='http://example.com/identity')
-        useropenid.save()
 
         # Posting in an identity URL begins the authentication request:
-        response = self.client.post('/openid/login/',
-            {'openid_identifier': 'http://example.com/identity',
-             'next': '/getuser/'})
+        response = self.client.post(self.login_url, self.openid_req)
         self.assertContains(response, 'OpenID transaction in progress')
 
         # Complete the request
@@ -1310,23 +1227,23 @@ class RelyingPartyTests(TestCase):
         teams_response = teams.TeamsResponse.extractResponse(
             teams_request, 'teamname,some-other-team')
         openid_response.addExtension(teams_response)
-        response = self.complete(openid_response)
+        mapping = {'teamname': 'groupname', 'otherteam': 'othergroup'}
+        with self.settings(
+                OPENID_LAUNCHPAD_TEAMS_MAPPING=mapping,
+                OPENID_LAUNCHPAD_TEAMS_MAPPING_AUTO=False):
+            response = self.complete(openid_response)
         self.assertRedirects(response, 'http://testserver/getuser/')
 
         # And they are now logged in as testuser
         response = self.client.get('/getuser/')
-        self.assertEquals(response.content, 'testuser')
+        self.assertEqual(response.content, 'testuser')
 
         # The user's groups have been updated.
-        user = User.objects.get(username='testuser')
-        self.assertTrue(group in user.groups.all())
-        self.assertTrue(ogroup not in user.groups.all())
+        User.objects.get(username='testuser')
+        self.assertIn(group, user.groups.all())
+        self.assertNotIn(ogroup, user.groups.all())
 
     def test_login_teams_automapping(self):
-        settings.OPENID_LAUNCHPAD_TEAMS_MAPPING = {'teamname': 'groupname',
-                                                   'otherteam': 'othergroup'}
-        settings.OPENID_LAUNCHPAD_TEAMS_MAPPING_AUTO = True
-        settings.OPENID_LAUNCHPAD_TEAMS_MAPPING_AUTO_BLACKLIST = ['django-group1', 'django-group2']
         user = User.objects.create_user('testuser', 'someone@example.com')
         group1 = Group(name='django-group1')
         group1.save()
@@ -1335,26 +1252,29 @@ class RelyingPartyTests(TestCase):
         group3 = Group(name='django-group3')
         group3.save()
         user.save()
-        useropenid = UserOpenID(
+        UserOpenID.objects.create(
             user=user,
             claimed_id='http://example.com/identity',
             display_id='http://example.com/identity')
-        useropenid.save()
 
         # Posting in an identity URL begins the authentication request:
-        response = self.client.post('/openid/login/',
-            {'openid_identifier': 'http://example.com/identity',
-             'next': '/getuser/'})
+        response = self.client.post(self.login_url, self.openid_req)
         self.assertContains(response, 'OpenID transaction in progress')
 
         # Complete the request
-        openid_request = self.provider.parseFormPost(response.content)
-        openid_response = openid_request.answer(True)
-        teams_request = teams.TeamsRequest.fromOpenIDRequest(openid_request)
+        mapping = {'teamname': 'groupname', 'otherteam': 'othergroup'}
+        blacklist = ['django-group1', 'django-group2']
+        with self.settings(
+                OPENID_LAUNCHPAD_TEAMS_MAPPING=mapping,
+                OPENID_LAUNCHPAD_TEAMS_MAPPING_AUTO=True,
+                OPENID_LAUNCHPAD_TEAMS_MAPPING_AUTO_BLACKLIST=blacklist):
+            openid_request = self.provider.parseFormPost(response.content)
+            openid_request.answer(True)
+            teams.TeamsRequest.fromOpenIDRequest(openid_request)
 
-        self.assertEqual(group1 in user.groups.all(), False)
-        self.assertEqual(group2 in user.groups.all(), False)
-        self.assertTrue(group3 not in user.groups.all())
+        self.assertNotIn(group1, user.groups.all())
+        self.assertNotIn(group2, user.groups.all())
+        self.assertNotIn(group3, user.groups.all())
 
     def test_login_teams_staff_not_defined(self):
         assert getattr(settings, 'OPENID_LAUNCHPAD_STAFF_TEAMS', None) is None
@@ -1363,39 +1283,42 @@ class RelyingPartyTests(TestCase):
         user.save()
         self.assertTrue(user.is_staff)
 
-        user = self.get_openid_authed_user_with_teams(user, 'teamname,some-other-team')
+        user = self.get_openid_authed_user_with_teams(
+            user, 'teamname,some-other-team')
         self.assertTrue(user.is_staff)
 
     def test_login_teams_staff_assignment(self):
-        settings.OPENID_LAUNCHPAD_STAFF_TEAMS = ('teamname',)
         user = User.objects.create_user('testuser', 'someone@example.com')
         user.is_staff = False
         user.save()
         self.assertFalse(user.is_staff)
 
-        user = self.get_openid_authed_user_with_teams(user, 'teamname,some-other-team')
+        with self.settings(
+                OPENID_LAUNCHPAD_STAFF_TEAMS=('teamname',)):
+            user = self.get_openid_authed_user_with_teams(
+                user, 'teamname,some-other-team')
         self.assertTrue(user.is_staff)
 
     def test_login_teams_staff_unassignment(self):
-        settings.OPENID_LAUNCHPAD_STAFF_TEAMS = ('different-teamname',)
         user = User.objects.create_user('testuser', 'someone@example.com')
         user.is_staff = True
         user.save()
         self.assertTrue(user.is_staff)
 
-        user = self.get_openid_authed_user_with_teams(user, 'teamname,some-other-team')
+        with self.settings(
+                OPENID_LAUNCHPAD_STAFF_TEAMS=('different-teamname',)):
+            user = self.get_openid_authed_user_with_teams(
+                user, 'teamname,some-other-team')
         self.assertFalse(user.is_staff)
 
     def get_openid_authed_user_with_teams(self, user, teams_str):
-        useropenid = UserOpenID(
+        UserOpenID.objects.create(
             user=user,
             claimed_id='http://example.com/identity',
             display_id='http://example.com/identity')
-        useropenid.save()
 
         # Posting in an identity URL begins the authentication request:
-        response = self.client.post('/openid/login/',
-            {'openid_identifier': 'http://example.com/identity'})
+        response = self.client.post(self.login_url, self.openid_req_no_next)
 
         # Complete the request
         openid_request = self.provider.parseFormPost(response.content)
@@ -1411,23 +1334,24 @@ class RelyingPartyTests(TestCase):
         # An oauth_login_complete signal is emitted including the
         # request and sreg_response.
         user = User.objects.create_user('someuser', 'someone@example.com')
-        useropenid = UserOpenID(
+        UserOpenID.objects.create(
             user=user,
             claimed_id='http://example.com/identity',
             display_id='http://example.com/identity')
-        useropenid.save()
-        response = self.client.post('/openid/login/',
-            {'openid_identifier': 'http://example.com/identity'})
+
+        response = self.client.post(self.login_url, self.openid_req_no_next)
         openid_request = self.provider.parseFormPost(response.content)
         openid_response = openid_request.answer(True)
         # Use a closure to test whether the signal handler was called.
         self.signal_handler_called = False
+
         def login_callback(sender, **kwargs):
-            self.assertTrue(isinstance(
-                kwargs.get('request', None), HttpRequest))
-            self.assertTrue(isinstance(
-                kwargs.get('openid_response', None), SuccessResponse))
+            self.assertIsInstance(
+                kwargs.get('request', None), HttpRequest)
+            self.assertIsInstance(
+                kwargs.get('openid_response', None), SuccessResponse)
             self.signal_handler_called = True
+
         openid_login_complete.connect(login_callback)
 
         response = self.complete(openid_response)
@@ -1438,9 +1362,11 @@ class RelyingPartyTests(TestCase):
 
 @override_session_serializer
 class HelperFunctionsTest(TestCase):
+
+    domains = ["example.com", "example.org"]
+
+    @override_settings(ALLOWED_EXTERNAL_OPENID_REDIRECT_DOMAINS=domains)
     def test_sanitise_redirect_url(self):
-        settings.ALLOWED_EXTERNAL_OPENID_REDIRECT_DOMAINS = [
-            "example.com", "example.org"]
         # list of URLs and whether they should be passed or not
         urls = [
             ("http://example.com", True),
@@ -1462,6 +1388,3 @@ class HelperFunctionsTest(TestCase):
                 self.assertEqual(url, sanitised)
             else:
                 self.assertEqual(settings.LOGIN_REDIRECT_URL, sanitised)
-
-def suite():
-    return unittest.TestLoader().loadTestsFromName(__name__)

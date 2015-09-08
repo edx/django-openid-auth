@@ -27,91 +27,44 @@
 # ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-# Django settings for example project.
+"""
+Django settings for example_consumer project.
+
+For more information on this file, see
+https://docs.djangoproject.com/en/1.7/topics/settings/
+
+For the full list of settings and their values, see
+https://docs.djangoproject.com/en/1.7/ref/settings/
+"""
+
+# Build paths inside the project like this: os.path.join(BASE_DIR, ...)
+import os
 import django
-django_version = django.get_version()
-DEBUG = True
-TEMPLATE_DEBUG = DEBUG
 
-ADMINS = (
-    # ('Your Name', 'your_email@domain.com'),
-)
+BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 
-MANAGERS = ADMINS
 
-if django_version >= "1.2":
-    csrf_middleware = 'django.middleware.csrf.CsrfViewMiddleware'
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': 'sqlite.db',
-        }
-    }
-    TEMPLATE_LOADERS = (
-        'django.template.loaders.filesystem.Loader',
-        'django.template.loaders.app_directories.Loader',
-    )
-else:
-    csrf_middleware = 'django.contrib.csrf.middleware.CsrfViewMiddleware'
-    TEMPLATE_LOADERS = (
-        'django.template.loaders.filesystem.load_template_source',
-        'django.template.loaders.app_directories.load_template_source',
-     )
-    DATABASE_ENGINE = 'sqlite3'           # 'postgresql_psycopg2', 'postgresql', 'mysql', 'sqlite3' or 'ado_mssql'.
-    DATABASE_NAME = 'sqlite.db'             # Or path to database file if using sqlite3.
-    DATABASE_USER = ''             # Not used with sqlite3.
-    DATABASE_PASSWORD = ''         # Not used with sqlite3.
-    DATABASE_HOST = ''             # Set to empty string for localhost. Not used with sqlite3.
-    DATABASE_PORT = ''             # Set to empty string for default. Not used with sqlite3.
+# Quick-start development settings - unsuitable for production
+# See https://docs.djangoproject.com/en/1.7/howto/deployment/checklist/
 
-# Local time zone for this installation. Choices can be found here:
-# http://www.postgresql.org/docs/8.1/static/datetime-keywords.html#DATETIME-TIMEZONE-SET-TABLE
-# although not all variations may be possible on all operating systems.
-# If running in a Windows environment this must be set to the same as your
-# system time zone.
-TIME_ZONE = 'America/Chicago'
-
-# Language code for this installation. All choices can be found here:
-# http://www.w3.org/TR/REC-html40/struct/dirlang.html#langcodes
-# http://blogs.law.harvard.edu/tech/stories/storyReader$15
-LANGUAGE_CODE = 'en-us'
-
-SITE_ID = 1
-
-# If you set this to False, Django will make some optimizations so as not
-# to load the internationalization machinery.
-USE_I18N = True
-
-# Absolute path to the directory that holds media.
-# Example: "/home/media/media.lawrence.com/"
-MEDIA_ROOT = ''
-
-# URL that handles the media served from MEDIA_ROOT.
-# Example: "http://media.lawrence.com"
-MEDIA_URL = ''
-
-# URL prefix for admin media -- CSS, JavaScript and images. Make sure to use a
-# trailing slash.
-# Examples: "http://foo.com/media/", "/media/".
-ADMIN_MEDIA_PREFIX = '/media/'
-
-# Make this unique, and don't share it with anybody.
+# SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = '34958734985734985734985798437'
+
+# SECURITY WARNING: don't run with debug turned on in production!
+DEBUG = True
+
+TEMPLATE_DEBUG = True
+
+ALLOWED_HOSTS = []
 
 MIDDLEWARE_CLASSES = (
     'django.middleware.common.CommonMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
-    csrf_middleware,
+    'django.middleware.csrf.CsrfViewMiddleware',
 )
 
-ROOT_URLCONF = 'example_consumer.urls'
-
-TEMPLATE_DIRS = (
-    # Put strings here, like "/home/html/django_templates" or "C:/www/django/templates".
-    # Always use forward slashes, even on Windows.
-    # Don't forget to use absolute paths, not relative paths.
-)
+# Application definition
 
 INSTALLED_APPS = (
     'django.contrib.auth',
@@ -119,8 +72,45 @@ INSTALLED_APPS = (
     'django.contrib.sessions',
     'django.contrib.admin',
     'django_openid_auth',
-    'south',
 )
+
+if django.VERSION < (1, 7):
+    INSTALLED_APPS += ('south',)
+
+ROOT_URLCONF = 'example_consumer.urls'
+
+WSGI_APPLICATION = 'example_consumer.wsgi.application'
+
+# Database
+# https://docs.djangoproject.com/en/1.7/ref/settings/#databases
+
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
+    }
+}
+
+# Internationalization
+# https://docs.djangoproject.com/en/1.7/topics/i18n/
+
+LANGUAGE_CODE = 'en-us'
+
+TIME_ZONE = 'UTC'
+
+USE_I18N = True
+
+USE_TZ = True
+
+# Static files (CSS, JavaScript, Images)
+# https://docs.djangoproject.com/en/1.7/howto/static-files/
+
+STATIC_URL = '/static/'
+
+# the library python-openid does not support a json session serializer
+# <openid.yadis.manager.YadisServiceManager> is not JSON serializable
+# https://github.com/openid/python-openid/issues/17
+SESSION_SERIALIZER = 'django.contrib.sessions.serializers.PickleSerializer'
 
 AUTHENTICATION_BACKENDS = (
     'django_openid_auth.auth.OpenIDBackend',
@@ -144,7 +134,7 @@ OPENID_VALID_VERIFICATION_SCHEMES = {
 
 # If set, always use this as the identity URL rather than asking the
 # user.  This only makes sense if it is a server URL.
-OPENID_SSO_SERVER_URL = 'https://login.launchpad.net/'
+OPENID_SSO_SERVER_URL = 'https://login.ubuntu.com/'
 
 # Tell django.contrib.auth to use the OpenID signin URLs.
 LOGIN_URL = '/openid/login/'

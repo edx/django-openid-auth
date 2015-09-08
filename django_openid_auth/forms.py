@@ -27,6 +27,8 @@
 # ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+from __future__ import unicode_literals
+
 from django import forms
 from django.contrib.auth.admin import UserAdmin
 from django.contrib.auth.forms import UserChangeForm
@@ -49,6 +51,7 @@ def teams_new_unicode(self):
         return "%s -> %s" % (name, ", ".join(group_teams))
     else:
         return name
+
 Group.unicode_before_teams = Group.__unicode__
 Group.__unicode__ = teams_new_unicode
 
@@ -64,9 +67,11 @@ class UserChangeFormWithTeamRestriction(UserChangeForm):
         user_groups = self.instance.groups.all()
         for group in data:
             if group.name in known_teams and group not in user_groups:
-                raise forms.ValidationError("""The group %s is mapped to an
-                    external team.  You cannot assign it manually.""" % group.name)
+                raise forms.ValidationError(
+                    "The group %s is mapped to an external team.  "
+                    "You cannot assign it manually." % group.name)
         return data
+
 UserAdmin.form = UserChangeFormWithTeamRestriction
 
 
@@ -78,10 +83,7 @@ class OpenIDLoginForm(forms.Form):
     def clean_openid_identifier(self):
         if 'openid_identifier' in self.cleaned_data:
             openid_identifier = self.cleaned_data['openid_identifier']
-            if xri.identifierScheme(openid_identifier) == 'XRI' and getattr(
-                settings, 'OPENID_DISALLOW_INAMES', False
-                ):
+            if (xri.identifierScheme(openid_identifier) == 'XRI' and
+                    getattr(settings, 'OPENID_DISALLOW_INAMES', False)):
                 raise forms.ValidationError(_('i-names are not supported'))
             return self.cleaned_data['openid_identifier']
-
-

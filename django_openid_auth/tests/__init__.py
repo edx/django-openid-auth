@@ -26,18 +26,8 @@
 # ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-import unittest
-from test_views import *
-from test_settings import *
-from test_store import *
-from test_auth import *
-from test_admin import *
-
-
-def suite():
-    suite = unittest.TestSuite()
-    for name in ['test_auth', 'test_models', 'test_settings', 'test_store',
-                 'test_views', 'test_admin']:
-        mod = __import__('%s.%s' % (__name__, name), {}, {}, ['suite'])
-        suite.addTest(mod.suite())
-    return suite
+from .test_views import *  # flake8: noqa
+from .test_settings import *
+from .test_store import *
+from .test_auth import *
+from .test_admin import *
