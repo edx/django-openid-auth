@@ -35,7 +35,8 @@ __metaclass__ = type
 import re
 
 from django.conf import settings
-from django.contrib.auth.models import User, Group, Permission
+from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group, Permission
 from openid.consumer.consumer import SUCCESS
 from openid.extensions import ax, sreg, pape
 
@@ -50,6 +51,9 @@ from django_openid_auth.exceptions import (
 )
 
 
+USER_MODEL = get_user_model()
+
+
 class OpenIDBackend:
     """A django.contrib.auth backend that authenticates the user based on
     an OpenID response."""
@@ -59,8 +63,8 @@ class OpenIDBackend:
 
     def get_user(self, user_id):
         try:
-            return User.objects.get(pk=user_id)
-        except User.DoesNotExist:
+            return USER_MODEL.objects.get(pk=user_id)
+        except USER_MODEL.DoesNotExist:
             return None
 
     def authenticate(self, **kwargs):
@@ -203,8 +207,8 @@ class OpenIDBackend:
 
         # See if we already have this nickname assigned to a username
         try:
-            User.objects.get(username__exact=nickname)
-        except User.DoesNotExist:
+            USER_MODEL.objects.get(username__exact=nickname)
+        except USER_MODEL.DoesNotExist:
             # No conflict, we can use this nickname
             return nickname
 
@@ -236,7 +240,7 @@ class OpenIDBackend:
             pass
 
         if getattr(settings, 'OPENID_STRICT_USERNAMES', False):
-            if User.objects.filter(username__exact=nickname).count() > 0:
+            if USER_MODEL.objects.filter(username__exact=nickname).count() > 0:
                 raise DuplicateUsernameViolation(
                     "The username (%s) with which you tried to log in is "
                     "already in use for a different account." % nickname)
@@ -245,14 +249,14 @@ class OpenIDBackend:
         # checking for conflicts.  Start with number of existing users who's
         # username starts with this nickname to avoid having to iterate over
         # all of the existing ones.
-        i = User.objects.filter(username__startswith=nickname).count() + 1
+        i = USER_MODEL.objects.filter(username__startswith=nickname).count() + 1
         while True:
             username = nickname
             if i > 1:
                 username += str(i)
             try:
-                User.objects.get(username__exact=username)
-            except User.DoesNotExist:
+                USER_MODEL.objects.get(username__exact=username)
+            except USER_MODEL.DoesNotExist:
                 break
             i += 1
         return username
@@ -276,7 +280,7 @@ class OpenIDBackend:
         username = self._get_available_username(
             nickname, openid_response.identity_url)
 
-        user = User.objects.create_user(username, email, password=None)
+        user = USER_MODEL.objects.create_user(username, email, password=None)
         self.associate_openid(user, openid_response)
         self.update_user_details(user, details, openid_response)
 

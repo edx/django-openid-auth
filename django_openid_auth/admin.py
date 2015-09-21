@@ -97,8 +97,8 @@ def _openid_login(instance, request, error_message='', extra_context=None):
 
     if not request.user.is_staff:
         return views.default_render_failure(
-            request, "User %s does not have admin/staff access."
-            % request.user.username)
+            request, "%s %s does not have admin/staff access."
+            % (settings.AUTH_USER_MODEL, request.user.username))
 
     # No error message was supplied
     assert error_message, "Unknown Error: %s" % error_message

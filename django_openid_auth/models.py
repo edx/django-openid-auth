@@ -29,8 +29,9 @@
 
 from __future__ import unicode_literals
 
+from django.conf import settings
 from django.db import models
-from django.contrib.auth.models import Permission, User
+from django.contrib.auth.models import Permission
 
 
 class Nonce(models.Model):
@@ -55,7 +56,7 @@ class Association(models.Model):
 
 
 class UserOpenID(models.Model):
-    user = models.ForeignKey(User)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL)
     claimed_id = models.TextField(max_length=2047, unique=True)
     display_id = models.TextField(max_length=2047)
 
