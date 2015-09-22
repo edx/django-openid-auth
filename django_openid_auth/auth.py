@@ -35,7 +35,8 @@ __metaclass__ = type
 import re
 
 from django.conf import settings
-from django.contrib.auth.models import User, Group, Permission
+from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group, Permission
 from openid.consumer.consumer import SUCCESS
 from openid.extensions import ax, sreg, pape
 
@@ -48,6 +49,9 @@ from django_openid_auth.exceptions import (
     MissingPhysicalMultiFactor,
     RequiredAttributeNotReturned,
 )
+
+
+User = get_user_model()
 
 
 class OpenIDBackend:
