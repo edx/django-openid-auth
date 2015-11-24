@@ -43,7 +43,7 @@ from setuptools import find_packages, setup
 
 
 description, long_description = __doc__.split('\n\n', 1)
-VERSION = '0.7'
+VERSION = '0.8'
 
 setup(
     name='django-openid-auth',
@@ -53,7 +53,6 @@ setup(
     install_requires=[
         'django>=1.5',
         'python-openid>=2.2.0',
-        'south',
     ],
     package_data={
         'django_openid_auth': ['templates/openid/*.html'],
