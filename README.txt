@@ -1,3 +1,15 @@
+
+This is a fork of https://launchpad.net/django-openid-auth. It has the following differences from upstream:
+
+* https://github.com/edx/django-openid-auth/pull/1.
+
+
+To bring in the latest changes:
+1. Import commits from the bazaar repo to the `upstream` branch of this repo using https://design.canonical.com/2015/01/converting-projects-between-git-and-bazaar/.
+2. Merge them into master.
+
+
+
 = Django OpenID Authentication Support =
 
 This package provides integration between Django's authentication
