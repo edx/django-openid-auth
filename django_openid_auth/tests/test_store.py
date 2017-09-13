@@ -28,6 +28,7 @@
 
 from __future__ import unicode_literals
 
+import base64
 import time
 
 from django.test import TestCase
@@ -52,7 +53,8 @@ class OpenIDStoreTests(TestCase):
             server_url='server-url', handle='handle')
         self.assertEquals(dbassoc.server_url, 'server-url')
         self.assertEquals(dbassoc.handle, 'handle')
-        self.assertEquals(dbassoc.secret, 'secret'.encode('base-64'))
+        self.assertEquals(
+            dbassoc.secret, base64.encodestring(b'secret').decode('utf-8'))
         self.assertEquals(dbassoc.issued, 42)
         self.assertEquals(dbassoc.lifetime, 600)
         self.assertEquals(dbassoc.assoc_type, 'HMAC-SHA1')
@@ -66,7 +68,8 @@ class OpenIDStoreTests(TestCase):
         self.store.storeAssociation('server-url', assoc)
         dbassoc = Association.objects.get(
             server_url='server-url', handle='handle')
-        self.assertEqual(dbassoc.secret, 'secret2'.encode('base-64'))
+        self.assertEqual(
+            dbassoc.secret, base64.encodestring(b'secret2').decode('utf-8'))
         self.assertEqual(dbassoc.issued, 420)
         self.assertEqual(dbassoc.lifetime, 900)
         self.assertEqual(dbassoc.assoc_type, 'HMAC-SHA256')
@@ -80,7 +83,7 @@ class OpenIDStoreTests(TestCase):
         self.assertTrue(isinstance(assoc, OIDAssociation))
 
         self.assertEquals(assoc.handle, 'handle')
-        self.assertEquals(assoc.secret, 'secret')
+        self.assertEquals(assoc.secret, b'secret')
         self.assertEquals(assoc.issued, timestamp)
         self.assertEquals(assoc.lifetime, 600)
         self.assertEquals(assoc.assoc_type, 'HMAC-SHA1')

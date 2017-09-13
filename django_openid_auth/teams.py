@@ -72,6 +72,7 @@ from openid.message import (
     registerNamespaceAlias,
     NamespaceAliasRegistrationError,
 )
+from six import string_types
 
 __all__ = [
     'TeamsRequest',
@@ -84,7 +85,7 @@ ns_uri = 'http://ns.launchpad.net/2007/openid-teams'
 
 try:
     registerNamespaceAlias(ns_uri, 'lp')
-except NamespaceAliasRegistrationError, e:
+except NamespaceAliasRegistrationError as e:
     oidutil.log(
         'registerNamespaceAlias(%r, %r) failed: %s' % (ns_uri, 'lp', str(e)))
 
@@ -139,7 +140,7 @@ def getTeamsNS(message):
         # There is no alias, so try to add one. (OpenID version 1)
         try:
             message.namespaces.addAlias(ns_uri, 'lp')
-        except KeyError, why:
+        except KeyError as why:
             # An alias for the string 'lp' already exists, but it's
             # defined for something other than Launchpad teams
             raise TeamsNamespaceError(why[0])
@@ -287,7 +288,7 @@ class TeamsRequest(Extension):
         @raise ValueError: when a team requested is not a string
             or strict is set and a team was requested more than once
         """
-        if isinstance(query_membership, basestring):
+        if isinstance(query_membership, string_types):
             raise TypeError('Teams should be passed as a list of '
                             'strings (not %r)' % (type(query_membership),))
 

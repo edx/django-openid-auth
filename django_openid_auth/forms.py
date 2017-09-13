@@ -38,6 +38,8 @@ from django.conf import settings
 
 from openid.yadis import xri
 
+from django_openid_auth import PY3
+
 
 def teams_new_unicode(self):
     """
@@ -52,8 +54,13 @@ def teams_new_unicode(self):
     else:
         return name
 
-Group.unicode_before_teams = Group.__unicode__
-Group.__unicode__ = teams_new_unicode
+
+if PY3:
+    Group.unicode_before_teams = Group.__str__
+    Group.__str__ = teams_new_unicode
+else:
+    Group.unicode_before_teams = Group.__unicode__
+    Group.__unicode__ = teams_new_unicode
 
 
 class UserChangeFormWithTeamRestriction(UserChangeForm):
@@ -71,6 +78,7 @@ class UserChangeFormWithTeamRestriction(UserChangeForm):
                     "The group %s is mapped to an external team.  "
                     "You cannot assign it manually." % group.name)
         return data
+
 
 UserAdmin.form = UserChangeFormWithTeamRestriction
 

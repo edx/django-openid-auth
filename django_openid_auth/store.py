@@ -36,6 +36,7 @@ from openid.association import Association as OIDAssociation
 from openid.store.interface import OpenIDStore
 from openid.store.nonce import SKEW
 
+from django_openid_auth import PY3
 from django_openid_auth.models import Association, Nonce
 
 
@@ -75,10 +76,15 @@ class DjangoOpenIDStore(OpenIDStore):
         expired = []
         for assoc in assocs:
             association = OIDAssociation(
-                assoc.handle, base64.decodestring(assoc.secret), assoc.issued,
-                assoc.lifetime, assoc.assoc_type
+                assoc.handle,
+                base64.decodestring(assoc.secret.encode('utf-8')),
+                assoc.issued, assoc.lifetime, assoc.assoc_type
             )
-            if association.getExpiresIn() == 0:
+            if PY3:
+                expires_in = association.expiresIn
+            else:
+                expires_in = association.getExpiresIn()
+            if expires_in == 0:
                 expired.append(assoc)
             else:
                 associations.append((association.issued, association))

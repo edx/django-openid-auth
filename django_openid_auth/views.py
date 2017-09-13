@@ -30,8 +30,11 @@
 from __future__ import unicode_literals
 
 import re
-import urllib
-from urlparse import urlsplit
+try:
+    from urllib.parse import urlencode, urlsplit
+except ImportError:
+    from urllib import urlencode
+    from urlparse import urlsplit
 
 from django.conf import settings
 from django.contrib.auth import (
@@ -39,6 +42,7 @@ from django.contrib.auth import (
 from django.contrib.auth.models import Group
 from django.core.urlresolvers import reverse
 from django.http import HttpResponse, HttpResponseRedirect
+from django.http.request import QueryDict
 from django.shortcuts import render_to_response
 from django.template import RequestContext
 from django.template.loader import render_to_string
@@ -129,22 +133,27 @@ def default_render_failure(request, message, status=403,
                            template_name='openid/failure.html',
                            exception=None):
     """Render an error page to the user."""
-    data = render_to_string(
-        template_name, dict(message=message, exception=exception),
-        context_instance=RequestContext(request))
+    context = RequestContext(request)
+    context.update(dict(message=message, exception=exception))
+    data = render_to_string(template_name, context)
     return HttpResponse(data, status=status)
 
 
 def parse_openid_response(request):
     """Parse an OpenID response from a Django request."""
-    # Short cut if there is no request parameters.
-    # if len(request.REQUEST) == 0:
-    #    return None
-
     current_url = request.build_absolute_uri()
 
     consumer = make_consumer(request)
-    return consumer.complete(dict(request.REQUEST.items()), current_url)
+    data = get_request_data(request)
+    return consumer.complete(data, current_url)
+
+
+def get_request_data(request):
+    # simulate old request.REQUEST for backwards compatibility
+    data = QueryDict(query_string=None, mutable=True)
+    data.update(request.GET)
+    data.update(request.POST)
+    return data
 
 
 def login_begin(request, template_name='openid/login.html',
@@ -153,7 +162,8 @@ def login_begin(request, template_name='openid/login.html',
                 render_failure=default_render_failure,
                 redirect_field_name=REDIRECT_FIELD_NAME):
     """Begin an OpenID login request, possibly asking for an identity URL."""
-    redirect_to = request.REQUEST.get(redirect_field_name, '')
+    data = get_request_data(request)
+    redirect_to = data.get(redirect_field_name, '')
 
     # Get the OpenID URL to try.  First see if we've been configured
     # to use a fixed server URL.
@@ -169,10 +179,12 @@ def login_begin(request, template_name='openid/login.html',
 
         # Invalid or no form data:
         if openid_url is None:
-            context = {'form': login_form, redirect_field_name: redirect_to}
-            return render_to_response(
-                template_name, context,
-                context_instance=RequestContext(request))
+            context = RequestContext(request)
+            context.update({
+                'form': login_form,
+                redirect_field_name: redirect_to,
+            })
+            return render_to_response(template_name, context)
 
     consumer = make_consumer(request)
     try:
@@ -268,7 +280,7 @@ def login_begin(request, template_name='openid/login.html',
         # Django gives us Unicode, which is great.  We must encode URI.
         # urllib enforces str. We can't trust anything about the default
         # encoding inside  str(foo) , so we must explicitly make foo a str.
-        return_to += urllib.urlencode(
+        return_to += urlencode(
             {redirect_field_name: redirect_to.encode("UTF-8")})
 
     return render_openid_request(request, openid_request, return_to)
@@ -277,7 +289,8 @@ def login_begin(request, template_name='openid/login.html',
 @csrf_exempt
 def login_complete(request, redirect_field_name=REDIRECT_FIELD_NAME,
                    render_failure=None):
-    redirect_to = request.REQUEST.get(redirect_field_name, '')
+    data = get_request_data(request)
+    redirect_to = data.get(redirect_field_name, '')
     render_failure = (
         render_failure or getattr(settings, 'OPENID_RENDER_FAILURE', None) or
         default_render_failure)
@@ -290,8 +303,9 @@ def login_complete(request, redirect_field_name=REDIRECT_FIELD_NAME,
     if openid_response.status == SUCCESS:
         try:
             user = authenticate(openid_response=openid_response)
-        except DjangoOpenIDException, e:
-            return render_failure(request, e.message, exception=e)
+        except DjangoOpenIDException as e:
+            return render_failure(
+                request, getattr(e, 'message', str(e)), exception=e)
 
         if user is not None:
             if user.is_active:
@@ -324,6 +338,7 @@ def logo(request):
     return HttpResponse(
         OPENID_LOGO_BASE_64.decode('base64'), mimetype='image/gif'
     )
+
 
 # Logo from http://openid.net/login-bg.gif
 # Embedded here for convenience; you should serve this as a static file

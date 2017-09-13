@@ -30,13 +30,12 @@
 
 from __future__ import unicode_literals
 
-__metaclass__ = type
-
 import re
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group, Permission
+from django.core.exceptions import ImproperlyConfigured
 from openid.consumer.consumer import SUCCESS
 from openid.extensions import ax, sreg, pape
 
@@ -49,12 +48,51 @@ from django_openid_auth.exceptions import (
     MissingPhysicalMultiFactor,
     RequiredAttributeNotReturned,
 )
+from django_openid_auth.signals import openid_duplicate_username
 
 
 User = get_user_model()
 
 
-class OpenIDBackend:
+def get_user_group_model():
+    """Returns the model used for mapping users to groups."""
+    user_group_model_name = getattr(settings, 'AUTH_USER_GROUP_MODEL', None)
+    if user_group_model_name is None:
+        return User.groups.through
+    else:
+        try:
+            # django.apps available starting from django 1.7
+            from django.apps import apps
+            get_model = apps.get_model
+            args = (user_group_model_name,)
+        except ImportError:
+            # if we can't import, then it must be django 1.6, still using
+            # the old django.db.models.loading code
+            from django.db.models.loading import get_model
+            app_label, model_name = user_group_model_name.split('.', 1)
+            args = (app_label, model_name)
+        try:
+            model = get_model(*args)
+            if model is None:
+                # in django 1.6 referring to a non-installed app will
+                # return None for get_model, but in 1.7 onwards it will
+                # raise a LookupError exception.
+                raise LookupError()
+            return model
+        except ValueError:
+            raise ImproperlyConfigured(
+                "AUTH_USER_GROUP_MODEL must be of the form "
+                "'app_label.model_name'")
+        except LookupError:
+            raise ImproperlyConfigured(
+                "AUTH_USER_GROUP_MODEL refers to model '%s' that has not been "
+                "installed" % user_group_model_name)
+
+
+UserGroup = get_user_group_model()
+
+
+class OpenIDBackend(object):
     """A django.contrib.auth backend that authenticates the user based on
     an OpenID response."""
 
@@ -116,8 +154,9 @@ class OpenIDBackend:
             teams_mapping = self.get_teams_mapping()
             groups_required = [group for team, group in teams_mapping.items()
                                if team in teams_required]
+            user_groups = UserGroup.objects.filter(user=user)
             matches = set(groups_required).intersection(
-                user.groups.values_list('name', flat=True))
+                user_groups.values_list('group__name', flat=True))
             if not matches:
                 name = 'OPENID_EMAIL_WHITELIST_REGEXP_LIST'
                 whitelist_regexp_list = getattr(settings, name, [])
@@ -194,28 +233,19 @@ class OpenIDBackend:
                 return suggestion
         return 'openiduser'
 
-    def _get_available_username(self, nickname, identity_url):
-        # If we're being strict about usernames, throw an error if we didn't
-        # get one back from the provider
-        if getattr(settings, 'OPENID_STRICT_USERNAMES', False):
-            if nickname is None or nickname == '':
-                raise MissingUsernameViolation()
-
+    def _get_available_username_for_nickname(self, nickname, identity_url):
         # If we don't have a nickname, and we're not being strict, use a
         # default
         nickname = nickname or 'openiduser'
 
         # See if we already have this nickname assigned to a username
-        try:
-            User.objects.get(username__exact=nickname)
-        except User.DoesNotExist:
-            # No conflict, we can use this nickname
+        if not User.objects.filter(username=nickname).exists():
             return nickname
 
         # Check if we already have nickname+i for this identity_url
         try:
             user_openid = UserOpenID.objects.get(
-                claimed_id__exact=identity_url,
+                claimed_id=identity_url,
                 user__username__startswith=nickname)
             # No exception means we have an existing user for this identity
             # that starts with this nickname.
@@ -239,27 +269,47 @@ class OpenIDBackend:
             # No user associated with this identity_url
             pass
 
-        if getattr(settings, 'OPENID_STRICT_USERNAMES', False):
-            if User.objects.filter(username__exact=nickname).count() > 0:
-                raise DuplicateUsernameViolation(
-                    "The username (%s) with which you tried to log in is "
-                    "already in use for a different account." % nickname)
-
         # Pick a username for the user based on their nickname,
         # checking for conflicts.  Start with number of existing users who's
         # username starts with this nickname to avoid having to iterate over
         # all of the existing ones.
         i = User.objects.filter(username__startswith=nickname).count() + 1
-        while True:
-            username = nickname
-            if i > 1:
-                username += str(i)
-            try:
-                User.objects.get(username__exact=username)
-            except User.DoesNotExist:
-                break
+        username = nickname
+        while User.objects.filter(username=username).exists():
+            username = nickname + str(i)
             i += 1
+
         return username
+
+    def _ensure_available_username(self, nickname, identity_url):
+        if not nickname:
+            raise MissingUsernameViolation()
+
+        # As long as the `QuerySet` does not get evaluated, no
+        # caching should be involved in our multiple `exists()`
+        # calls. See docs for details: http://bit.ly/2aYCmkw
+        user_with_same_username = User.objects.exclude(
+            useropenid__claimed_id=identity_url
+        ).filter(username=nickname)
+
+        if user_with_same_username.exists():
+            # Notify any listeners that a duplicated username was
+            # found and give the opportunity to handle conflict.
+            openid_duplicate_username.send(sender=User, username=nickname)
+
+            # Check for conflicts again as the signal could have handled it.
+            if user_with_same_username.exists():
+                raise DuplicateUsernameViolation(
+                    "The username (%s) with which you tried to log in is "
+                    "already in use for a different account." % nickname)
+
+    def _get_available_username(self, nickname, identity_url):
+        if getattr(settings, 'OPENID_STRICT_USERNAMES', False):
+            self._ensure_available_username(nickname, identity_url)
+        else:
+            nickname = self._get_available_username_for_nickname(
+                nickname, identity_url)
+        return nickname
 
     def create_user_from_openid(self, openid_response):
         details = self._extract_user_details(openid_response)
@@ -357,13 +407,17 @@ class OpenIDBackend:
         mapping = [
             teams_mapping[lp_team] for lp_team in teams_response.is_member
             if lp_team in teams_mapping]
+        user_groups = UserGroup.objects.filter(user=user)
+        matching_groups = user_groups.filter(
+            group__name__in=teams_mapping.values())
         current_groups = set(
-            user.groups.filter(name__in=teams_mapping.values()))
+            user_group.group for user_group in matching_groups)
         desired_groups = set(Group.objects.filter(name__in=mapping))
-        for group in current_groups - desired_groups:
-            user.groups.remove(group)
-        for group in desired_groups - current_groups:
-            user.groups.add(group)
+        groups_to_remove = current_groups - desired_groups
+        groups_to_add = desired_groups - current_groups
+        user_groups.filter(group__in=groups_to_remove).delete()
+        for group in groups_to_add:
+            UserGroup.objects.create(user=user, group=group)
 
     def update_staff_status_from_teams(self, user, teams_response):
         if not hasattr(settings, 'OPENID_LAUNCHPAD_STAFF_TEAMS'):
