@@ -133,7 +133,7 @@ def default_render_failure(request, message, status=403,
                            template_name='openid/failure.html',
                            exception=None):
     """Render an error page to the user."""
-    context = RequestContext(request)
+    context = RequestContext(request).flatten()
     context.update(dict(message=message, exception=exception))
     data = render_to_string(template_name, context)
     return HttpResponse(data, status=status)
@@ -179,7 +179,7 @@ def login_begin(request, template_name='openid/login.html',
 
         # Invalid or no form data:
         if openid_url is None:
-            context = RequestContext(request)
+            context = RequestContext(request).flatten()
             context.update({
                 'form': login_form,
                 redirect_field_name: redirect_to,
