@@ -28,7 +28,7 @@
 
 from __future__ import unicode_literals
 
-from django.conf.urls import patterns, include
+from django.conf.urls import include, url
 from django.http import HttpResponse
 
 
@@ -36,8 +36,7 @@ def get_user(request):
     return HttpResponse(request.user.username)
 
 
-urlpatterns = patterns(
-    '',
-    (r'^getuser/$', get_user),
-    (r'^openid/', include('django_openid_auth.urls')),
-)
+urlpatterns = [
+    url(r'^getuser/$', get_user),
+    url(r'^openid/', include('django_openid_auth.urls')),
+]

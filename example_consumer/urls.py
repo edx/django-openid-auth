@@ -27,20 +27,20 @@
 # ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-from django.conf.urls import patterns, include, url
+from django.conf.urls import include, url
 from django.contrib import admin
+from django.contrib.auth import views as auth_views
 
-import views
+from example_consumer import views
 
 
 admin.autodiscover()
 
-urlpatterns = patterns(
-    '',
+urlpatterns = [
     url(r'^$', views.index),
     url(r'^openid/', include('django_openid_auth.urls')),
-    url(r'^logout/$', 'django.contrib.auth.views.logout'),
+    url(r'^logout/$', auth_views.logout),
     url(r'^private/$', views.require_authentication),
 
     url(r'^admin/', include(admin.site.urls)),
-)
+]

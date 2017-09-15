@@ -31,13 +31,17 @@ from __future__ import unicode_literals
 
 import cgi
 
-from urlparse import parse_qs
+try:
+    from urllib.parse import parse_qs
+except ImportError:
+    from urlparse import parse_qs
 
 from django.conf import settings
 from django.contrib.auth.models import User, Group, Permission
 from django.core.urlresolvers import reverse
 from django.http import HttpRequest, HttpResponse
 from django.test import TestCase
+from django.test.client import RequestFactory
 from django.test.utils import override_settings
 from mock import patch
 from openid.consumer.consumer import Consumer, SuccessResponse
@@ -54,8 +58,9 @@ from django_openid_auth import teams
 from django_openid_auth.models import UserOpenID
 from django_openid_auth.tests.helpers import override_session_serializer
 from django_openid_auth.views import (
-    sanitise_redirect_url,
+    get_request_data,
     make_consumer,
+    sanitise_redirect_url,
 )
 from django_openid_auth.signals import openid_login_complete
 from django_openid_auth.store import DjangoOpenIDStore
@@ -123,8 +128,8 @@ class StubOpenIDProvider(HTTPFetcher):
     def parseFormPost(self, content):
         """Parse an HTML form post to create an OpenID request."""
         # Hack to make the javascript XML compliant ...
-        content = content.replace('i < elements.length',
-                                  'i &lt; elements.length')
+        content = content.replace(
+            'i < elements.length', 'i &lt; elements.length')
         tree = ET.XML(content)
         form = tree.find('.//form')
         assert form is not None, 'No form in document'
@@ -135,8 +140,7 @@ class StubOpenIDProvider(HTTPFetcher):
         for input in form.findall('input'):
             if input.get('type') != 'hidden':
                 continue
-            query[input.get('name').encode('UTF-8')] = \
-                input.get('value').encode('UTF-8')
+            query[input.get('name')] = input.get('value')
         self.last_request = self.server.decodeRequest(query)
         return self.last_request
 
@@ -163,13 +167,6 @@ class DummyDjangoRequest(object):
     def build_absolute_uri(self):
         return self.META['SCRIPT_NAME'] + self.request_path
 
-    def _combined_request(self):
-        request = {}
-        request.update(self.POST)
-        request.update(self.GET)
-        return request
-    REQUEST = property(_combined_request)
-
 
 @override_session_serializer
 @override_settings(
@@ -184,10 +181,10 @@ class DummyDjangoRequest(object):
     OPENID_SREG_REQUIRED_FIELDS=[],
     OPENID_USE_EMAIL_FOR_USERNAME=False,
     OPENID_VALID_VERIFICATION_SCHEMES={},
+    ROOT_URLCONF='django_openid_auth.tests.urls',
 )
 class RelyingPartyTests(TestCase):
 
-    urls = 'django_openid_auth.tests.urls'
     login_url = reverse('openid-login')
 
     def setUp(self):
@@ -241,7 +238,8 @@ class RelyingPartyTests(TestCase):
         response = self.client.post(self.login_url, self.openid_req)
         self.assertContains(response, 'OpenID transaction in progress')
 
-        openid_request = self.provider.parseFormPost(response.content)
+        openid_request = self.provider.parseFormPost(
+            response.content.decode('utf-8'))
         self.assertEqual(openid_request.mode, 'checkid_setup')
         self.assertTrue(openid_request.return_to.startswith(
             'http://testserver/openid/complete/'))
@@ -253,7 +251,7 @@ class RelyingPartyTests(TestCase):
 
         # And they are now logged in:
         response = self.client.get('/getuser/')
-        self.assertEqual(response.content, 'someuser')
+        self.assertEqual(response.content.decode('utf-8'), 'someuser')
 
     def test_login_with_nonascii_return_to(self):
         """Ensure non-ascii characters can be used for the 'next' arg."""
@@ -275,7 +273,8 @@ class RelyingPartyTests(TestCase):
 
         self.assertContains(response, 'OpenID transaction in progress')
 
-        openid_request = self.provider.parseFormPost(response.content)
+        openid_request = self.provider.parseFormPost(
+            response.content.decode('utf-8'))
         self.assertEqual(openid_request.mode, 'checkid_setup')
         self.assertTrue(openid_request.return_to.startswith(
             'http://testserver/openid/complete/'))
@@ -302,7 +301,8 @@ class RelyingPartyTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'OpenID transaction in progress')
 
-        openid_request = self.provider.parseFormPost(response.content)
+        openid_request = self.provider.parseFormPost(
+            response.content.decode('utf-8'))
         self.assertEqual(openid_request.mode, 'checkid_setup')
         self.assertTrue(openid_request.return_to.startswith(
             'http://testserver/openid/complete/'))
@@ -314,7 +314,7 @@ class RelyingPartyTests(TestCase):
 
         # And they are now logged in:
         response = self.client.get('/getuser/')
-        self.assertEqual(response.content, 'someuser')
+        self.assertEqual(response.content.decode('utf-8'), 'someuser')
 
     def test_login_create_users(self):
         # Create a user with the same name as we'll pass back via sreg.
@@ -326,7 +326,8 @@ class RelyingPartyTests(TestCase):
 
         # Complete the request, passing back some simple registration
         # data.  The user is redirected to the next URL.
-        openid_request = self.provider.parseFormPost(response.content)
+        openid_request = self.provider.parseFormPost(
+            response.content.decode('utf-8'))
         sreg_request = sreg.SRegRequest.fromOpenIDRequest(openid_request)
         openid_response = openid_request.answer(True)
         sreg_response = sreg.SRegResponse.extractResponse(
@@ -340,7 +341,7 @@ class RelyingPartyTests(TestCase):
         # And they are now logged in as a new user (they haven't taken
         # over the existing "someuser" user).
         response = self.client.get('/getuser/')
-        self.assertEqual(response.content, 'someuser2')
+        self.assertEqual(response.content.decode('utf-8'), 'someuser2')
 
         # Check the details of the new user.
         user = User.objects.get(username='someuser2')
@@ -364,7 +365,8 @@ class RelyingPartyTests(TestCase):
 
         # Complete the request, passing back some simple registration
         # data.  The user is redirected to the next URL.
-        openid_request = self.provider.parseFormPost(response.content)
+        openid_request = self.provider.parseFormPost(
+            response.content.decode('utf-8'))
         return openid_request
 
     def _get_login_response(self, openid_request, resp_data, use_sreg,
@@ -388,7 +390,8 @@ class RelyingPartyTests(TestCase):
         self.provider.type_uris.append(pape.ns_uri)
 
         response = self.client.post(self.login_url, self.openid_req)
-        openid_request = self.provider.parseFormPost(response.content)
+        openid_request = self.provider.parseFormPost(
+            response.content.decode('utf-8'))
 
         request_auth = openid_request.message.getArg(
             'http://specs.openid.net/extensions/pape/1.0',
@@ -436,7 +439,7 @@ class RelyingPartyTests(TestCase):
             query['openid.pape.auth_policies'], [preferred_auth])
 
         response = self.client.get('/getuser/')
-        self.assertEqual(response.content, 'testuser')
+        self.assertEqual(response.content.decode('utf-8'), 'testuser')
 
     @override_settings(OPENID_PHYSICAL_MULTIFACTOR_REQUIRED=True)
     def test_login_physical_multifactor_not_provided(self):
@@ -552,10 +555,11 @@ class RelyingPartyTests(TestCase):
             response = self.client.get('/getuser/')
 
         # username defaults to 'openiduser'
-        self.assertEqual(response.content, 'openiduser')
+        username = response.content.decode('utf-8')
+        self.assertEqual(username, 'openiduser')
 
         # The user's full name and email have been updated.
-        user = User.objects.get(username=response.content)
+        user = User.objects.get(username=username)
         self.assertEqual(user.first_name, 'Openid')
         self.assertEqual(user.last_name, 'User')
         self.assertEqual(user.email, 'foo@example.com')
@@ -570,7 +574,7 @@ class RelyingPartyTests(TestCase):
             response = self.client.get('/getuser/')
 
         # username defaults to a munged version of the email
-        self.assertEqual(response.content, 'fooexamplecom')
+        self.assertEqual(response.content.decode('utf-8'), 'fooexamplecom')
 
     def test_login_duplicate_username_numbering(self):
         # Setup existing user who's name we're going to conflict with
@@ -587,7 +591,7 @@ class RelyingPartyTests(TestCase):
 
         # Since this username is already taken by someone else, we go through
         # the process of adding +i to it, and get testuser2.
-        self.assertEqual(response.content, 'testuser2')
+        self.assertEqual(response.content.decode('utf-8'), 'testuser2')
 
     def test_login_duplicate_username_numbering_with_conflicts(self):
         # Setup existing user who's name we're going to conflict with
@@ -607,7 +611,7 @@ class RelyingPartyTests(TestCase):
         # the process of adding +i to it starting with the count of users with
         # username starting with 'testuser', of which there are 2.  i should
         # start at 3, which already exists, so it should skip to 4.
-        self.assertEqual(response.content, 'testuser4')
+        self.assertEqual(response.content.decode('utf-8'), 'testuser4')
 
     def test_login_duplicate_username_numbering_with_holes(self):
         # Setup existing user who's name we're going to conflict with
@@ -630,7 +634,7 @@ class RelyingPartyTests(TestCase):
         # the process of adding +i to it starting with the count of users with
         # username starting with 'testuser', of which there are 5.  i should
         # start at 6, and increment until it reaches 9.
-        self.assertEqual(response.content, 'testuser9')
+        self.assertEqual(response.content.decode('utf-8'), 'testuser9')
 
     def test_login_duplicate_username_numbering_with_nonsequential_matches(
             self):
@@ -651,7 +655,7 @@ class RelyingPartyTests(TestCase):
         # the process of adding +i to it starting with the count of users with
         # username starting with 'testuser', of which there are 2.  i should
         # start at 3, which will be available.
-        self.assertEqual(response.content, 'testuser3')
+        self.assertEqual(response.content.decode('utf-8'), 'testuser3')
 
     def test_login_follow_rename(self):
         user = User.objects.create_user('testuser', 'someone@example.com')
@@ -671,10 +675,11 @@ class RelyingPartyTests(TestCase):
 
         # If OPENID_FOLLOW_RENAMES, they are logged in as
         # someuser (the passed in nickname has changed the username)
-        self.assertEqual(response.content, 'someuser')
+        username = response.content.decode('utf-8')
+        self.assertEqual(username, 'someuser')
 
         # The user's full name and email have been updated.
-        user = User.objects.get(username=response.content)
+        user = User.objects.get(username=username)
         self.assertEqual(user.first_name, 'Some')
         self.assertEqual(user.last_name, 'User')
         self.assertEqual(user.email, 'foo@example.com')
@@ -696,10 +701,11 @@ class RelyingPartyTests(TestCase):
             response = self.client.get('/getuser/')
 
         # Username should not have changed
-        self.assertEqual(response.content, 'testuser')
+        username = response.content.decode('utf-8')
+        self.assertEqual(username, 'testuser')
 
         # The user's full name and email have been updated.
-        user = User.objects.get(username=response.content)
+        user = User.objects.get(username=username)
         self.assertEqual(user.first_name, 'Some')
         self.assertEqual(user.last_name, 'User')
         self.assertEqual(user.email, 'foo@example.com')
@@ -735,10 +741,11 @@ class RelyingPartyTests(TestCase):
         # If OPENID_FOLLOW_RENAMES, attempt to change username to 'testuser'
         # but since that username is already taken by someone else, we go
         # through the process of adding +i to it, and get testuser2.
-        self.assertEqual(response.content, 'testuser2')
+        username = response.content.decode('utf-8')
+        self.assertEqual(username, 'testuser2')
 
         # The user's full name and email have been updated.
-        user = User.objects.get(username=response.content)
+        user = User.objects.get(username=username)
         self.assertEqual(user.first_name, 'Rename')
         self.assertEqual(user.last_name, 'User')
         self.assertEqual(user.email, 'rename@example.com')
@@ -777,10 +784,11 @@ class RelyingPartyTests(TestCase):
         # the username follows the nickname+i scheme, it has non-numbers in the
         # suffix, so it's not an auto-generated one.  The regular process of
         # renaming to 'testuser' has a conflict, so we get +2 at the end.
-        self.assertEqual(response.content, 'testuser2')
+        username = response.content.decode('utf-8')
+        self.assertEqual(username, 'testuser2')
 
         # The user's full name and email have been updated.
-        user = User.objects.get(username=response.content)
+        user = User.objects.get(username=username)
         self.assertEqual(user.first_name, 'Rename')
         self.assertEqual(user.last_name, 'User')
         self.assertEqual(user.email, 'rename@example.com')
@@ -817,10 +825,11 @@ class RelyingPartyTests(TestCase):
         # but since that username is already taken by someone else, we go
         # through the process of adding +i to it.  Since the user for this
         # identity url already has a name matching that pattern, check if first
-        self.assertEqual(response.content, 'testuser2000')
+        username = response.content.decode('utf-8')
+        self.assertEqual(username, 'testuser2000')
 
         # The user's full name and email have been updated.
-        user = User.objects.get(username=response.content)
+        user = User.objects.get(username=username)
         self.assertEqual(user.first_name, 'Rename')
         self.assertEqual(user.last_name, 'User')
         self.assertEqual(user.email, 'rename@example.com')
@@ -847,10 +856,11 @@ class RelyingPartyTests(TestCase):
 
         # If OPENID_FOLLOW_RENAMES, username should be changed to 'testuser'
         # because it wasn't currently taken
-        self.assertEqual(response.content, 'testuser')
+        username = response.content.decode('utf-8')
+        self.assertEqual(username, 'testuser')
 
         # The user's full name and email have been updated.
-        user = User.objects.get(username=response.content)
+        user = User.objects.get(username=username)
         self.assertEqual(user.first_name, 'Same')
         self.assertEqual(user.last_name, 'User')
         self.assertEqual(user.email, 'same@example.com')
@@ -865,7 +875,8 @@ class RelyingPartyTests(TestCase):
 
         # Complete the request, passing back some simple registration
         # data.  The user is redirected to the next URL.
-        openid_request = self.provider.parseFormPost(response.content)
+        openid_request = self.provider.parseFormPost(
+            response.content.decode('utf-8'))
         sreg_request = sreg.SRegRequest.fromOpenIDRequest(openid_request)
         openid_response = openid_request.answer(True)
         sreg_response = sreg.SRegResponse.extractResponse(
@@ -903,7 +914,8 @@ class RelyingPartyTests(TestCase):
 
         # Complete the request, passing back some simple registration
         # data.  The user is redirected to the next URL.
-        openid_request = self.provider.parseFormPost(response.content)
+        openid_request = self.provider.parseFormPost(
+            response.content.decode('utf-8'))
         sreg_request = sreg.SRegRequest.fromOpenIDRequest(openid_request)
         openid_response = openid_request.answer(True)
         sreg_response = sreg.SRegResponse.extractResponse(
@@ -932,7 +944,8 @@ class RelyingPartyTests(TestCase):
 
         # Complete the request, passing back some simple registration
         # data.  The user is redirected to the next URL.
-        openid_request = self.provider.parseFormPost(response.content)
+        openid_request = self.provider.parseFormPost(
+            response.content.decode('utf-8'))
         sreg_request = sreg.SRegRequest.fromOpenIDRequest(openid_request)
         openid_response = openid_request.answer(True)
         sreg_response = sreg.SRegResponse.extractResponse(
@@ -974,7 +987,8 @@ class RelyingPartyTests(TestCase):
 
         # Complete the request, passing back some simple registration
         # data.  The user is redirected to the next URL.
-        openid_request = self.provider.parseFormPost(response.content)
+        openid_request = self.provider.parseFormPost(
+            response.content.decode('utf-8'))
         sreg_request = sreg.SRegRequest.fromOpenIDRequest(openid_request)
         openid_response = openid_request.answer(True)
         sreg_response = sreg.SRegResponse.extractResponse(
@@ -997,7 +1011,8 @@ class RelyingPartyTests(TestCase):
 
         # Complete the request, passing back some simple registration
         # data.  The user is redirected to the next URL.
-        openid_request = self.provider.parseFormPost(response.content)
+        openid_request = self.provider.parseFormPost(
+            response.content.decode('utf-8'))
         sreg_request = sreg.SRegRequest.fromOpenIDRequest(openid_request)
         openid_response = openid_request.answer(True)
         sreg_response = sreg.SRegResponse.extractResponse(
@@ -1033,10 +1048,11 @@ class RelyingPartyTests(TestCase):
             self._do_user_login(self.openid_req, self.openid_resp)
             response = self.client.get('/getuser/')
 
-        self.assertEqual(response.content, 'testuser')
+        username = response.content.decode('utf-8')
+        self.assertEqual(username, 'testuser')
 
         # The user's full name and email have been updated.
-        user = User.objects.get(username=response.content)
+        user = User.objects.get(username=username)
         self.assertEqual(user.first_name, 'Some')
         self.assertEqual(user.last_name, 'User')
         self.assertEqual(user.email, 'foo@example.com')
@@ -1052,7 +1068,8 @@ class RelyingPartyTests(TestCase):
         with self.settings(OPENID_SREG_EXTRA_FIELDS=('language',)):
             response = self.client.post(self.login_url, self.openid_req)
 
-        openid_request = self.provider.parseFormPost(response.content)
+        openid_request = self.provider.parseFormPost(
+            response.content.decode('utf-8'))
         sreg_request = sreg.SRegRequest.fromOpenIDRequest(openid_request)
         for field in ('email', 'fullname', 'nickname', 'language'):
             self.assertTrue(field in sreg_request)
@@ -1069,7 +1086,8 @@ class RelyingPartyTests(TestCase):
         with self.settings(OPENID_SREG_REQUIRED_FIELDS=('email', 'language')):
             response = self.client.post(self.login_url, self.openid_req)
 
-        openid_request = self.provider.parseFormPost(response.content)
+        openid_request = self.provider.parseFormPost(
+            response.content.decode('utf-8'))
         sreg_request = sreg.SRegRequest.fromOpenIDRequest(openid_request)
 
         self.assertEqual(['email', 'language'], sreg_request.required)
@@ -1091,7 +1109,8 @@ class RelyingPartyTests(TestCase):
 
         # The resulting OpenID request uses the Attribute Exchange
         # extension rather than the Simple Registration extension.
-        openid_request = self.provider.parseFormPost(response.content)
+        openid_request = self.provider.parseFormPost(
+            response.content.decode('utf-8'))
         sreg_request = sreg.SRegRequest.fromOpenIDRequest(openid_request)
         self.assertEqual(sreg_request.required, [])
         self.assertEqual(sreg_request.optional, [])
@@ -1137,7 +1156,7 @@ class RelyingPartyTests(TestCase):
         assert not settings.OPENID_FOLLOW_RENAMES, (
             'OPENID_FOLLOW_RENAMES must be False')
         response = self.client.get('/getuser/')
-        self.assertEqual(response.content, 'testuser')
+        self.assertEqual(response.content.decode('utf-8'), 'testuser')
 
         # The user's full name and email have been updated.
         user = User.objects.get(username='testuser')
@@ -1221,7 +1240,8 @@ class RelyingPartyTests(TestCase):
         self.assertContains(response, 'OpenID transaction in progress')
 
         # Complete the request
-        openid_request = self.provider.parseFormPost(response.content)
+        openid_request = self.provider.parseFormPost(
+            response.content.decode('utf-8'))
         openid_response = openid_request.answer(True)
         teams_request = teams.TeamsRequest.fromOpenIDRequest(openid_request)
         teams_response = teams.TeamsResponse.extractResponse(
@@ -1236,7 +1256,7 @@ class RelyingPartyTests(TestCase):
 
         # And they are now logged in as testuser
         response = self.client.get('/getuser/')
-        self.assertEqual(response.content, 'testuser')
+        self.assertEqual(response.content.decode('utf-8'), 'testuser')
 
         # The user's groups have been updated.
         User.objects.get(username='testuser')
@@ -1268,7 +1288,8 @@ class RelyingPartyTests(TestCase):
                 OPENID_LAUNCHPAD_TEAMS_MAPPING=mapping,
                 OPENID_LAUNCHPAD_TEAMS_MAPPING_AUTO=True,
                 OPENID_LAUNCHPAD_TEAMS_MAPPING_AUTO_BLACKLIST=blacklist):
-            openid_request = self.provider.parseFormPost(response.content)
+            openid_request = self.provider.parseFormPost(
+                response.content.decode('utf-8'))
             openid_request.answer(True)
             teams.TeamsRequest.fromOpenIDRequest(openid_request)
 
@@ -1321,7 +1342,8 @@ class RelyingPartyTests(TestCase):
         response = self.client.post(self.login_url, self.openid_req_no_next)
 
         # Complete the request
-        openid_request = self.provider.parseFormPost(response.content)
+        openid_request = self.provider.parseFormPost(
+            response.content.decode('utf-8'))
         openid_response = openid_request.answer(True)
         teams_request = teams.TeamsRequest.fromOpenIDRequest(openid_request)
         teams_response = teams.TeamsResponse.extractResponse(
@@ -1340,7 +1362,8 @@ class RelyingPartyTests(TestCase):
             display_id='http://example.com/identity')
 
         response = self.client.post(self.login_url, self.openid_req_no_next)
-        openid_request = self.provider.parseFormPost(response.content)
+        openid_request = self.provider.parseFormPost(
+            response.content.decode('utf-8'))
         openid_response = openid_request.answer(True)
         # Use a closure to test whether the signal handler was called.
         self.signal_handler_called = False
@@ -1388,3 +1411,24 @@ class HelperFunctionsTest(TestCase):
                 self.assertEqual(url, sanitised)
             else:
                 self.assertEqual(settings.LOGIN_REDIRECT_URL, sanitised)
+
+    def test_get_request_data_from_post(self):
+        request = RequestFactory().post('/', data={'foo': 'bar'})
+        data = get_request_data(request)
+        self.assertEqual(dict(data), {'foo': ['bar']})
+
+    def test_get_request_data_from_get(self):
+        request = RequestFactory().get('/', data={'foo': 'bar'})
+        data = get_request_data(request)
+        self.assertEqual(dict(data), {'foo': ['bar']})
+
+    def test_get_request_data_merged(self):
+        request = RequestFactory().post('/?baz=42', data={'foo': 'bar'})
+        data = get_request_data(request)
+        self.assertEqual(dict(data), {'foo': ['bar'], 'baz': ['42']})
+
+    def test_get_request_data_override_order(self):
+        request = RequestFactory().post('/?foo=42', data={'foo': 'bar'})
+        data = get_request_data(request)
+        self.assertEqual(dict(data), {'foo': ['42', 'bar']})
+        self.assertEqual(data['foo'], 'bar')

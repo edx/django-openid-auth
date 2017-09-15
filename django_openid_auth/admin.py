@@ -29,8 +29,11 @@
 
 from __future__ import unicode_literals
 
-from urllib import urlencode
-from urlparse import parse_qsl, urlparse
+try:
+    from urllib.parse import parse_qsl, urlencode, urlparse
+except ImportError:
+    from urllib import urlencode
+    from urlparse import parse_qsl, urlparse
 
 from django.conf import settings
 from django.contrib import admin
@@ -50,6 +53,7 @@ class NonceAdmin(admin.ModelAdmin):
         self.message_user(request, "%d expired nonces removed" % count)
     cleanup_nonces.short_description = "Clean up expired nonces"
 
+
 admin.site.register(Nonce, NonceAdmin)
 
 
@@ -65,6 +69,7 @@ class AssociationAdmin(admin.ModelAdmin):
         self.message_user(request, "%d expired associations removed" % count)
     cleanup_associations.short_description = "Clean up expired associations"
 
+
 admin.site.register(Association, AssociationAdmin)
 
 
@@ -72,6 +77,7 @@ class UserOpenIDAdmin(admin.ModelAdmin):
     raw_id_fields = ('user',)
     list_display = ('user', 'claimed_id')
     search_fields = ('claimed_id',)
+
 
 admin.site.register(UserOpenID, UserOpenIDAdmin)
 

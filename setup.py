@@ -39,21 +39,28 @@ library also includes the following features:
     info.
 """
 
+import sys
+
 from setuptools import find_packages, setup
+
+PY3 = sys.version_info.major >= 3
 
 
 description, long_description = __doc__.split('\n\n', 1)
-VERSION = '0.8'
+VERSION = '0.14'
+
+install_requires = ['django>=1.6', 'six']
+if PY3:
+    install_requires.append('python3-openid')
+else:
+    install_requires.append('python-openid>=2.2.0')
 
 setup(
     name='django-openid-auth',
     version=VERSION,
 
     packages=find_packages(),
-    install_requires=[
-        'django>=1.5',
-        'python-openid>=2.2.0',
-    ],
+    install_requires=install_requires,
     package_data={
         'django_openid_auth': ['templates/openid/*.html'],
     },
