@@ -43,9 +43,8 @@ from django.contrib.auth.models import Group
 from django.core.urlresolvers import reverse
 from django.http import HttpResponse, HttpResponseRedirect
 from django.http.request import QueryDict
-from django.shortcuts import render_to_response
+from django.shortcuts import render_to_response, render
 from django.template import RequestContext
-from django.template.loader import render_to_string
 try:
     from django.views.decorators.csrf import csrf_exempt
 except ImportError:
@@ -133,10 +132,8 @@ def default_render_failure(request, message, status=403,
                            template_name='openid/failure.html',
                            exception=None):
     """Render an error page to the user."""
-    context = RequestContext(request).flatten()
-    context.update(dict(message=message, exception=exception))
-    data = render_to_string(template_name, context)
-    return HttpResponse(data, status=status)
+    return render(request, template_name,
+                  {'message': message, 'exception': exception}, status=status)
 
 
 def parse_openid_response(request):
