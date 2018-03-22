@@ -47,7 +47,7 @@ PY3 = sys.version_info.major >= 3
 
 
 description, long_description = __doc__.split('\n\n', 1)
-VERSION = '0.15'
+VERSION = '0.15.1'
 
 install_requires = ['django>=1.6', 'six']
 if PY3:
@@ -59,7 +59,7 @@ setup(
     name='django-openid-auth',
     version=VERSION,
 
-    packages=find_packages(),
+    packages=find_packages(include=['django_openid_auth*']),
     install_requires=install_requires,
     package_data={
         'django_openid_auth': ['templates/openid/*.html'],
