@@ -47,7 +47,7 @@ PY3 = sys.version_info.major >= 3
 
 
 description, long_description = __doc__.split('\n\n', 1)
-VERSION = '0.15.1'
+VERSION = '0.15.2'
 
 install_requires = ['django>=1.6', 'six']
 if PY3:
