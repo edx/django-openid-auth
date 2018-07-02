@@ -45,7 +45,7 @@ class Migration(migrations.Migration):
                 ('id', models.AutoField(verbose_name='ID', serialize=False, auto_created=True, primary_key=True)),
                 ('claimed_id', models.TextField(max_length=2047)),
                 ('display_id', models.TextField(max_length=2047)),
-                ('user', models.ForeignKey(to=settings.AUTH_USER_MODEL)),
+                ('user', models.ForeignKey(to=settings.AUTH_USER_MODEL, on_delete=models.CASCADE)),
             ],
             options={
                 'permissions': (('account_verified', 'The OpenID has been verified'),),
