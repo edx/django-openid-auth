@@ -40,9 +40,12 @@ from django.conf import settings
 from django.contrib.auth import (
     REDIRECT_FIELD_NAME, authenticate, login as auth_login)
 from django.contrib.auth.models import Group
+
 try:
     from django.urls import reverse
 except ImportError:
+    # SHIM: For Django 1.11 and 2.x compatibility, can be removed, once
+    # support for 1.11 is dropped.
     from django.core.urlresolvers import reverse
 from django.http import HttpResponse, HttpResponseRedirect
 from django.http.request import QueryDict
