@@ -38,7 +38,12 @@ except ImportError:
 
 from django.conf import settings
 from django.contrib.auth.models import User, Group, Permission
-from django.core.urlresolvers import reverse
+
+try:
+    from django.urls import reverse
+except ImportError:
+    from django.core.urlresolvers import reverse
+
 from django.http import HttpRequest, HttpResponse
 from django.test import TestCase
 from django.test.client import RequestFactory
@@ -247,7 +252,7 @@ class RelyingPartyTests(TestCase):
         # Complete the request.  The user is redirected to the next URL.
         openid_response = openid_request.answer(True)
         response = self.complete(openid_response)
-        self.assertRedirects(response, 'http://testserver/getuser/')
+        self.assertRedirects(response, '/getuser/')
 
         # And they are now logged in:
         response = self.client.get('/getuser/')
@@ -283,7 +288,7 @@ class RelyingPartyTests(TestCase):
         openid_response = openid_request.answer(True)
         with self.settings(LOGIN_REDIRECT_URL='/getuser/'):
             response = self.complete(openid_response)
-        self.assertRedirects(response, 'http://testserver/getuser/')
+        self.assertRedirects(response, '/getuser/')
 
     def test_login_sso(self):
         user = User.objects.create_user('someuser', 'someone@example.com')
@@ -310,7 +315,7 @@ class RelyingPartyTests(TestCase):
         # Complete the request.  The user is redirected to the next URL.
         openid_response = openid_request.answer(True)
         response = self.complete(openid_response)
-        self.assertRedirects(response, 'http://testserver/getuser/')
+        self.assertRedirects(response, '/getuser/')
 
         # And they are now logged in:
         response = self.client.get('/getuser/')
@@ -336,7 +341,7 @@ class RelyingPartyTests(TestCase):
         openid_response.addExtension(sreg_response)
         with self.settings(OPENID_CREATE_USERS=True):
             response = self.complete(openid_response)
-        self.assertRedirects(response, 'http://testserver/getuser/')
+        self.assertRedirects(response, '/getuser/')
 
         # And they are now logged in as a new user (they haven't taken
         # over the existing "someuser" user).
@@ -355,7 +360,7 @@ class RelyingPartyTests(TestCase):
         openid_response = self._get_login_response(
             openid_request, resp_data, use_sreg, use_pape)
         response = self.complete(openid_response)
-        self.assertRedirects(response, 'http://testserver/getuser/')
+        self.assertRedirects(response, '/getuser/')
         return response
 
     def _get_login_request(self, req_data):
@@ -1149,7 +1154,7 @@ class RelyingPartyTests(TestCase):
         openid_response.addExtension(fetch_response)
         with self.settings(OPENID_UPDATE_DETAILS_FROM_SREG=True):
             response = self.complete(openid_response)
-        self.assertRedirects(response, 'http://testserver/getuser/')
+        self.assertRedirects(response, '/getuser/')
 
         # And they are now logged in as testuser (the passed in
         # nickname has not caused the username to change), because
@@ -1252,7 +1257,7 @@ class RelyingPartyTests(TestCase):
                 OPENID_LAUNCHPAD_TEAMS_MAPPING=mapping,
                 OPENID_LAUNCHPAD_TEAMS_MAPPING_AUTO=False):
             response = self.complete(openid_response)
-        self.assertRedirects(response, 'http://testserver/getuser/')
+        self.assertRedirects(response, '/getuser/')
 
         # And they are now logged in as testuser
         response = self.client.get('/getuser/')
