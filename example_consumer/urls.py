@@ -32,7 +32,7 @@ try:
 except ImportError:
     from django.conf.urls import include, url
 from django.contrib import admin
-from django.contrib.auth import views as auth_views
+from django.contrib.auth import logout
 
 from example_consumer import views
 
@@ -42,7 +42,7 @@ admin.autodiscover()
 urlpatterns = [
     url(r'^$', views.index),
     url(r'^openid/', include('django_openid_auth.urls')),
-    url(r'^logout/$', auth_views.logout),
+    url(r'^logout/$', logout),
     url(r'^private/$', views.require_authentication),
 ]
 
