@@ -93,7 +93,13 @@ def _openid_login(instance, request, error_message='', extra_context=None):
         return original_admin_login(
             instance, request, extra_context=extra_context)
 
-    if not request.user.is_authenticated():
+    authenticated = False
+    try:
+        authenticated = request.user.is_authenticated()
+    except Exception:
+        authenticated = request.user.is_authenticated
+
+    if not authenticated:
         # Redirect to openid login path,
         _, _, path, _, query, _ = urlparse(request.get_full_path())
         qs = dict(parse_qsl(query))
