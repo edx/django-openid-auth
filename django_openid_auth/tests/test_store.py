@@ -35,6 +35,7 @@ from django.test import TestCase
 from openid.association import Association as OIDAssociation
 from openid.store.nonce import SKEW
 
+from django_openid_auth import PY3
 from django_openid_auth.models import Association, Nonce
 from django_openid_auth.store import DjangoOpenIDStore
 
@@ -53,8 +54,14 @@ class OpenIDStoreTests(TestCase):
             server_url='server-url', handle='handle')
         self.assertEquals(dbassoc.server_url, 'server-url')
         self.assertEquals(dbassoc.handle, 'handle')
-        self.assertEquals(
-            dbassoc.secret, base64.encodestring(b'secret').decode('utf-8'))
+        if isinstance(dbassoc.secret, str) and not dbassoc.secret.startswith("b'"):
+            dbassoc.secret = bytes(dbassoc.secret, 'utf-8')
+        if PY3:
+            self.assertEquals(
+                '%s' % dbassoc.secret, '%s' % base64.b64encode(b'secret'))
+        else:
+            self.assertEquals(
+                '%s' % dbassoc.secret, '%s' % base64.encodestring(b'secret'))
         self.assertEquals(dbassoc.issued, 42)
         self.assertEquals(dbassoc.lifetime, 600)
         self.assertEquals(dbassoc.assoc_type, 'HMAC-SHA1')
@@ -68,8 +75,14 @@ class OpenIDStoreTests(TestCase):
         self.store.storeAssociation('server-url', assoc)
         dbassoc = Association.objects.get(
             server_url='server-url', handle='handle')
-        self.assertEqual(
-            dbassoc.secret, base64.encodestring(b'secret2').decode('utf-8'))
+        if isinstance(dbassoc.secret, str) and not dbassoc.secret.startswith("b'"):
+            dbassoc.secret = bytes(dbassoc.secret, 'utf-8')
+        if PY3:
+            self.assertEqual(
+                '%s' % dbassoc.secret, '%s' % base64.b64encode(b'secret2'))
+        else:
+            self.assertEqual(
+                '%s' % dbassoc.secret, '%s' % base64.encodestring(b'secret2'))
         self.assertEqual(dbassoc.issued, 420)
         self.assertEqual(dbassoc.lifetime, 900)
         self.assertEqual(dbassoc.assoc_type, 'HMAC-SHA256')

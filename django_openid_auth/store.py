@@ -50,7 +50,16 @@ class DjangoOpenIDStore(OpenIDStore):
         try:
             assoc = Association.objects.get(
                 server_url=server_url, handle=association.handle)
+            if isinstance(assoc.secret, str) and PY3:
+                try:
+                    assoc.secret = assoc.secret.split("b'")[1].split("'")[0]
+                except Exception:
+                    pass
+                assoc.secret = bytes(assoc.secret, 'utf-8')
         except Association.DoesNotExist:
+            if isinstance(association.secret, str) and PY3:
+                association.secret = association.secret.split("b'")[1].split("'")[0]
+                association.secret = bytes(association.secret, 'utf-8')
             assoc = Association(
                 server_url=server_url,
                 handle=association.handle,
@@ -59,10 +68,18 @@ class DjangoOpenIDStore(OpenIDStore):
                 lifetime=association.lifetime,
                 assoc_type=association.assoc_type)
         else:
+            if isinstance(assoc.secret, str) and PY3:
+                try:
+                    assoc.secret = assoc.secret.split("b'")[1].split("'")[0]
+                except Exception:
+                    pass
+                assoc.secret = bytes(assoc.secret, 'utf-8')
             assoc.secret = base64.encodestring(association.secret)
             assoc.issued = association.issued
             assoc.lifetime = association.lifetime
             assoc.assoc_type = association.assoc_type
+        if isinstance(assoc.secret, bytes) and PY3:
+            assoc.secret = bytes(assoc.secret.decode('utf-8').rstrip(), 'utf-8')
         assoc.save()
 
     def getAssociation(self, server_url, handle=None):
@@ -75,9 +92,21 @@ class DjangoOpenIDStore(OpenIDStore):
         associations = []
         expired = []
         for assoc in assocs:
+            if isinstance(assoc.secret, str) and PY3:
+                try:
+                    assoc.secret = assoc.secret.split("b'")[1].split("'")[0]
+                except Exception:
+                    pass
+                assoc.secret = bytes(assoc.secret, 'utf-8')
+            if isinstance(assoc.secret, bytes) and PY3:
+                assoc.secret = bytes(assoc.secret.decode('utf-8').rstrip(), 'utf-8')
+            if PY3:
+                decoded = base64.decodebytes(assoc.secret)
+            else:
+                decoded = base64.decodestring(assoc.secret)
             association = OIDAssociation(
                 assoc.handle,
-                base64.decodestring(assoc.secret.encode('utf-8')),
+                decoded,
                 assoc.issued, assoc.lifetime, assoc.assoc_type
             )
             if PY3:
