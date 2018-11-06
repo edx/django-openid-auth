@@ -105,11 +105,16 @@ class OpenIDBackend(object):
         except User.DoesNotExist:
             return None
 
-    def authenticate(self, **kwargs):
+    def authenticate(self, request=None, **kwargs):
         """Authenticate the user based on an OpenID response."""
         # Require that the OpenID response be passed in as a keyword
         # argument, to make sure we don't match the username/password
         # calling conventions of authenticate.
+
+        # Handle Django 2.0 vs Django 2.1
+        # pretty untested with Django 2.0, but now works with Django 2.1
+        if kwargs == None:
+            kwargs = request
 
         openid_response = kwargs.get('openid_response')
         if openid_response is None:

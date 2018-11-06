@@ -187,7 +187,7 @@ def login_begin(request, template_name='openid/login.html',
                 'form': login_form,
                 redirect_field_name: redirect_to,
             })
-            return render_to_response(template_name, context)
+            return render(request, template_name, context)
 
     consumer = make_consumer(request)
     try:
