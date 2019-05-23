@@ -2,6 +2,14 @@
 # http://open-edx-proposals.readthedocs.io/en/latest/oep-0002-bp-repo-metadata.html#specification
 
 nick: opid
-oeps: {}
-owner: edx/platform-team
+owner: nasthagiri
+supporting_teams:
+    - platform-authn
 track-pulls: true
+oeps:
+    oep-2: true
+    oep-7: false
+    oep-18: false
+
+tags:
+    - library
